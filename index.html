@@ -1,0 +1,1854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Constellation — a night sky of what you've read</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  color-scheme: dark;
+  --bg0:#060917;
+  --bg1:#0d1128;
+  --bg2:#141a3a;
+  --ink:#eeecf8;
+  --ink-dim:#b3b0d4;
+  --ink-faint:#8683ab;
+  --amber:#f2c078;
+  --amber-soft:rgba(242,192,120,.16);
+  --violet:#c4b5fd;
+  --indigo:#7c8ce8;
+  --line:rgba(168,176,255,.16);
+  --line-soft:rgba(168,176,255,.09);
+  --card:rgba(19,23,50,.78);
+  --card-solid:#151a3c;
+  --glass:rgba(16,20,44,.66);
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --sans:"Avenir Next","Avenir","Segoe UI",system-ui,-apple-system,sans-serif;
+  --shadow:0 12px 40px rgba(2,4,16,.55);
+  --r-lg:20px;
+  --r-md:14px;
+  --r-sm:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--sans);
+  color:var(--ink);
+  background:
+    radial-gradient(120% 90% at 70% -10%, #1b1f4a 0%, transparent 55%),
+    radial-gradient(100% 80% at 10% 110%, #191436 0%, transparent 60%),
+    linear-gradient(175deg, var(--bg0) 0%, var(--bg1) 55%, #0b0d22 100%);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+  font-size:16px;
+  line-height:1.5;
+}
+.hidden{display:none !important}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- ambient nebulae ---------- */
+.nebula{position:fixed;border-radius:50%;filter:blur(70px);pointer-events:none;z-index:0;opacity:.5;will-change:transform}
+#neb1{width:56vmax;height:40vmax;left:-12vmax;top:-10vmax;background:radial-gradient(closest-side,rgba(94,84,196,.34),transparent 70%);animation:drift1 68s ease-in-out infinite alternate}
+#neb2{width:48vmax;height:42vmax;right:-16vmax;bottom:-14vmax;background:radial-gradient(closest-side,rgba(196,120,84,.16),rgba(140,90,180,.12) 45%,transparent 72%);animation:drift2 84s ease-in-out infinite alternate}
+#neb3{width:34vmax;height:30vmax;left:38vw;top:44vh;background:radial-gradient(closest-side,rgba(84,110,200,.16),transparent 70%);animation:drift3 96s ease-in-out infinite alternate}
+@keyframes drift1{from{transform:translate(0,0) scale(1)}to{transform:translate(6vmax,4vmax) scale(1.12)}}
+@keyframes drift2{from{transform:translate(0,0) scale(1.05)}to{transform:translate(-5vmax,-5vmax) scale(.95)}}
+@keyframes drift3{from{transform:translate(0,0)}to{transform:translate(-8vmax,5vmax) scale(1.18)}}
+
+#sky{position:fixed;inset:0;width:100%;height:100%;z-index:1;touch-action:none}
+#sky.grabbing{cursor:grabbing}
+#sky.can-grab{cursor:grab}
+#sky.pointing{cursor:pointer}
+#vignette{position:fixed;inset:0;z-index:2;pointer-events:none;background:radial-gradient(120% 120% at 50% 45%, transparent 55%, rgba(3,5,14,.5) 100%)}
+
+/* ---------- top bar ---------- */
+#topbar{
+  position:fixed;top:0;left:0;right:0;z-index:20;
+  display:flex;align-items:center;gap:18px;
+  padding:14px 22px;
+}
+.brand{font-family:var(--serif);font-size:21px;letter-spacing:.4px;color:var(--ink);text-shadow:0 0 24px rgba(242,192,120,.35);white-space:nowrap}
+.brand-star{color:var(--amber);display:inline-block;animation:brandTwinkle 5s ease-in-out infinite}
+@keyframes brandTwinkle{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.65;transform:scale(.9)}}
+.views{display:flex;gap:4px;background:var(--glass);border:1px solid var(--line-soft);border-radius:999px;padding:4px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);margin:0 auto}
+.view-btn{
+  appearance:none;border:none;background:transparent;color:var(--ink-dim);
+  font-family:var(--sans);font-size:14.5px;font-weight:500;letter-spacing:.3px;
+  padding:8px 18px;border-radius:999px;cursor:pointer;
+  transition:color .25s,background .25s,box-shadow .25s;
+  min-height:38px;
+}
+.view-btn:hover{color:var(--ink)}
+.view-btn.active{color:#1b1430;background:linear-gradient(140deg,#f4d29a,#e8b168);box-shadow:0 2px 16px rgba(242,192,120,.35);font-weight:600}
+.top-actions{display:flex;gap:8px;white-space:nowrap}
+
+/* ---------- buttons ---------- */
+.ghost-btn,.primary-btn,.danger-btn{
+  appearance:none;font-family:var(--sans);font-size:14.5px;font-weight:500;
+  border-radius:var(--r-sm);cursor:pointer;min-height:40px;padding:8px 16px;
+  transition:transform .2s ease,box-shadow .25s ease,background .25s,color .25s,border-color .25s;
+  letter-spacing:.2px;
+}
+.ghost-btn{background:var(--glass);border:1px solid var(--line);color:var(--ink-dim);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.ghost-btn:hover{color:var(--ink);border-color:rgba(200,206,255,.38);box-shadow:0 4px 18px rgba(20,26,70,.5);transform:translateY(-1px)}
+.primary-btn{background:linear-gradient(140deg,#f4d29a,#e2a95f);border:none;color:#221636;font-weight:600}
+.primary-btn:hover{box-shadow:0 6px 22px rgba(242,192,120,.4);transform:translateY(-1px)}
+.primary-btn:disabled,.ghost-btn:disabled{opacity:.5;cursor:default;transform:none;box-shadow:none}
+.danger-btn{background:transparent;border:1px solid rgba(255,130,130,.35);color:#f2a3a3}
+.danger-btn:hover{background:rgba(255,110,110,.12);border-color:rgba(255,140,140,.6);color:#ffc4c4}
+.ghost-btn.small{min-height:32px;padding:4px 12px;font-size:13px}
+.icon{padding:8px 12px;font-size:17px;line-height:1}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+/* ---------- sky overlays ---------- */
+#sky-tooltip{
+  position:fixed;z-index:15;pointer-events:none;max-width:300px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:9px 13px;font-size:13.5px;color:var(--ink);box-shadow:var(--shadow);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  opacity:0;transform:translateY(4px);transition:opacity .18s,transform .18s;
+}
+#sky-tooltip.show{opacity:1;transform:translateY(0)}
+#sky-tooltip .tt-text{font-family:var(--serif);font-size:14.5px;line-height:1.35}
+#sky-tooltip .tt-meta{color:var(--ink-faint);font-size:12px;margin-top:3px;letter-spacing:.4px}
+
+#sky-empty{
+  position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;pointer-events:none;padding:24px;
+  animation:fadeIn 1.4s ease both;
+}
+#sky-empty h2{font-family:var(--serif);font-weight:500;font-size:32px;letter-spacing:.5px;margin:18px 0 12px;text-shadow:0 2px 30px rgba(124,140,232,.5)}
+#sky-empty p{color:var(--ink-dim);font-size:16.5px;line-height:1.65;max-width:460px}
+#sky-empty .empty-star{font-size:38px;color:var(--amber);animation:pulseStar 3.4s ease-in-out infinite;text-shadow:0 0 34px rgba(242,192,120,.8)}
+#sky-empty button{pointer-events:auto;margin-top:26px}
+@keyframes pulseStar{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.82);opacity:.6}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+#zoomctl{position:fixed;right:20px;bottom:110px;z-index:12;display:flex;flex-direction:column;gap:8px}
+#zoomctl button{
+  width:42px;height:42px;border-radius:50%;border:1px solid var(--line);
+  background:var(--glass);color:var(--ink-dim);font-size:19px;cursor:pointer;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  transition:color .2s,border-color .2s,transform .2s,box-shadow .25s;
+}
+#zoomctl button:hover{color:var(--amber);border-color:rgba(242,192,120,.4);transform:translateY(-1px);box-shadow:0 4px 16px rgba(20,26,70,.55)}
+
+/* ---------- panels (list / books) ---------- */
+.panel{
+  position:fixed;z-index:14;left:50%;transform:translateX(-50%);
+  top:76px;bottom:104px;width:min(860px,94vw);
+  background:var(--card);border:1px solid var(--line-soft);border-radius:var(--r-lg);
+  box-shadow:var(--shadow);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+  display:flex;flex-direction:column;overflow:hidden;
+  animation:panelIn .38s cubic-bezier(.22,.9,.3,1) both;
+}
+@keyframes panelIn{from{opacity:0;transform:translateX(-50%) translateY(16px) scale(.985)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+.panel-head{padding:18px 20px 10px;border-bottom:1px solid var(--line-soft)}
+#search{
+  width:100%;background:rgba(10,13,32,.6);border:1px solid var(--line);border-radius:var(--r-md);
+  color:var(--ink);font-family:var(--serif);font-size:16.5px;padding:11px 16px;
+  transition:border-color .25s,box-shadow .25s;
+}
+#search::placeholder{color:var(--ink-faint)}
+#search:focus{border-color:rgba(242,192,120,.55);box-shadow:0 0 0 3px rgba(242,192,120,.12);outline:none}
+.filter-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+.seg{display:inline-flex;background:rgba(10,13,32,.6);border:1px solid var(--line-soft);border-radius:999px;padding:3px;gap:2px}
+.seg button{
+  appearance:none;border:none;background:transparent;color:var(--ink-dim);cursor:pointer;
+  font-family:var(--sans);font-size:13.5px;padding:6px 14px;border-radius:999px;min-height:32px;
+  transition:background .22s,color .22s;
+}
+.seg button:hover{color:var(--ink)}
+.seg button.active{background:rgba(124,140,232,.28);color:var(--ink)}
+select,input[type="date"]{
+  background:rgba(10,13,32,.6);border:1px solid var(--line-soft);border-radius:999px;color:var(--ink-dim);
+  font-family:var(--sans);font-size:13.5px;padding:7px 12px;min-height:38px;cursor:pointer;
+  transition:border-color .2s,color .2s;
+}
+select:hover,input[type="date"]:hover{color:var(--ink);border-color:var(--line)}
+.tag-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.tag-row:empty{margin-top:0}
+.chip{
+  appearance:none;border:1px solid var(--line-soft);background:transparent;color:var(--ink-faint);
+  border-radius:999px;padding:3px 12px;font-size:12.5px;cursor:pointer;font-family:var(--sans);
+  transition:all .2s;min-height:26px;letter-spacing:.3px;
+}
+.chip:hover{color:var(--violet);border-color:rgba(196,181,253,.4)}
+.chip.active{background:rgba(196,181,253,.16);border-color:rgba(196,181,253,.5);color:var(--violet)}
+#entry-list,#book-grid{overflow-y:auto;padding:16px 20px 24px;flex:1;scrollbar-width:thin;scrollbar-color:rgba(140,150,220,.3) transparent}
+#entry-list::-webkit-scrollbar,#book-grid::-webkit-scrollbar{width:8px}
+#entry-list::-webkit-scrollbar-thumb,#book-grid::-webkit-scrollbar-thumb{background:rgba(140,150,220,.25);border-radius:8px}
+.panel-empty{padding:60px 30px;text-align:center;color:var(--ink-dim);font-family:var(--serif);font-size:17px;line-height:1.7}
+.panel-empty .pe-star{font-size:26px;color:var(--indigo);display:block;margin-bottom:14px;opacity:.7}
+
+/* entry cards */
+.entry-card{
+  background:rgba(24,29,62,.55);border:1px solid var(--line-soft);border-radius:var(--r-md);
+  padding:15px 18px;margin-bottom:11px;cursor:pointer;
+  transition:transform .22s ease,border-color .25s,box-shadow .3s,background .25s;
+  animation:fadeUp .45s cubic-bezier(.22,.9,.3,1) both;
+}
+.entry-card:hover{transform:translateY(-2px);border-color:rgba(200,206,255,.3);box-shadow:0 8px 26px rgba(5,8,24,.5);background:rgba(28,34,72,.65)}
+.ec-head{display:flex;align-items:baseline;gap:9px}
+.ec-star{font-size:14px;flex:none}
+.ec-star.idea{color:var(--amber);text-shadow:0 0 12px rgba(242,192,120,.7)}
+.ec-star.vocab{color:var(--violet);text-shadow:0 0 12px rgba(196,181,253,.7)}
+.ec-text{font-family:var(--serif);font-size:17px;line-height:1.45;color:var(--ink)}
+.ec-def{font-family:var(--serif);font-style:italic;color:var(--ink-dim);font-size:14.5px;margin:6px 0 0 23px;line-height:1.5}
+.ec-meta{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;margin:9px 0 0 23px;color:var(--ink-faint);font-size:12.5px;letter-spacing:.35px}
+.ec-meta .chip{min-height:22px;padding:1px 10px;font-size:11.5px}
+.cover-thumb{width:18px;height:26px;object-fit:cover;border-radius:3px;vertical-align:-7px;margin-right:5px;box-shadow:0 1px 6px rgba(0,0,0,.5)}
+.ec-book{display:inline-flex;align-items:center;color:var(--ink-dim)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+
+/* books grid */
+#book-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:14px;align-content:start}
+.book-card{
+  background:rgba(24,29,62,.55);border:1px solid var(--line-soft);border-radius:var(--r-md);
+  padding:16px;display:flex;flex-direction:column;gap:10px;
+  transition:transform .22s,border-color .25s,box-shadow .3s;
+  animation:fadeUp .45s cubic-bezier(.22,.9,.3,1) both;
+}
+.book-card:hover{transform:translateY(-3px);border-color:rgba(200,206,255,.3);box-shadow:0 10px 30px rgba(5,8,24,.55)}
+.bc-top{display:flex;gap:13px;align-items:flex-start}
+.bc-cover{width:56px;height:82px;border-radius:6px;object-fit:cover;flex:none;box-shadow:0 4px 14px rgba(0,0,0,.55)}
+.bc-cover-ph{
+  width:56px;height:82px;border-radius:6px;flex:none;display:flex;align-items:center;justify-content:center;
+  font-family:var(--serif);font-size:26px;color:rgba(238,236,248,.85);
+  background:linear-gradient(155deg,#3b3f7e,#25294f);box-shadow:inset 0 0 0 1px rgba(200,206,255,.15),0 4px 14px rgba(0,0,0,.45);
+}
+.bc-name{font-family:var(--serif);font-size:17px;line-height:1.3;color:var(--ink)}
+.bc-counts{color:var(--ink-faint);font-size:12.5px;margin-top:5px;letter-spacing:.35px;line-height:1.6}
+.bc-actions{display:flex;gap:6px;flex-wrap:wrap}
+.bc-actions .ghost-btn{min-height:32px;padding:4px 11px;font-size:12.5px}
+
+/* ---------- quick capture bar ---------- */
+#quickbar{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:22;
+  display:flex;align-items:center;gap:9px;width:min(780px,94vw);
+  background:var(--glass);border:1px solid var(--line);border-radius:999px;
+  padding:9px 10px 9px 10px;box-shadow:var(--shadow);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  transition:border-color .3s,box-shadow .3s;
+}
+#quickbar:focus-within{border-color:rgba(242,192,120,.45);box-shadow:0 12px 44px rgba(2,4,16,.6),0 0 0 3px rgba(242,192,120,.08)}
+#qb-text{
+  flex:1;min-width:0;background:transparent;border:none;color:var(--ink);
+  font-family:var(--serif);font-size:16.5px;padding:8px 4px;
+}
+#qb-text::placeholder{color:var(--ink-faint)}
+#qb-text:focus{outline:none}
+#qb-book{
+  width:150px;background:rgba(10,13,32,.55);border:1px solid var(--line-soft);border-radius:999px;
+  color:var(--ink-dim);font-family:var(--sans);font-size:13.5px;padding:8px 14px;min-height:38px;
+  transition:border-color .25s,color .25s;
+}
+#qb-book::placeholder{color:var(--ink-faint)}
+#qb-book:focus{outline:none;border-color:rgba(242,192,120,.4);color:var(--ink)}
+#qb-add{
+  appearance:none;border:none;border-radius:999px;min-height:42px;padding:8px 20px;
+  background:linear-gradient(140deg,#f4d29a,#e2a95f);color:#221636;font-weight:600;font-size:14.5px;
+  cursor:pointer;font-family:var(--sans);white-space:nowrap;
+  transition:box-shadow .3s,transform .2s;
+}
+#qb-add:hover{box-shadow:0 4px 22px rgba(242,192,120,.45);transform:translateY(-1px)}
+#qb-more{border-radius:50%;width:42px;height:42px;flex:none;border:1px solid var(--line-soft);background:transparent;color:var(--ink-faint);cursor:pointer;font-size:18px;transition:all .2s}
+#qb-more:hover{color:var(--ink);border-color:var(--line)}
+#qb-type button{font-size:13px;padding:6px 12px}
+
+/* ---------- dictionary card ---------- */
+#dict-card{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:92px;z-index:21;
+  width:min(600px,92vw);
+  background:linear-gradient(160deg,rgba(30,32,72,.92),rgba(18,20,48,.92));
+  border:1px solid rgba(196,181,253,.28);border-radius:var(--r-lg);
+  padding:18px 46px 17px 22px;box-shadow:0 16px 50px rgba(2,4,16,.65),0 0 40px rgba(124,110,220,.12);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  animation:dictIn .45s cubic-bezier(.22,.9,.3,1) both;
+}
+@keyframes dictIn{from{opacity:0;transform:translateX(-50%) translateY(16px) scale(.97)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+.dc-close{position:absolute;top:9px;right:10px;background:none;border:none;color:var(--ink-faint);font-size:19px;cursor:pointer;padding:6px 9px;border-radius:8px;transition:color .2s}
+.dc-close:hover{color:var(--ink)}
+.dc-word{font-family:var(--serif);font-size:21px;color:var(--ink);display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.dc-phon{color:var(--violet);font-size:15px;font-family:var(--sans)}
+.dc-pos{color:var(--ink-faint);font-size:13px;font-style:italic;letter-spacing:.5px}
+.dc-def{font-family:var(--serif);font-size:16px;line-height:1.55;color:var(--ink-dim);margin-top:7px}
+.dc-origin{color:var(--ink-faint);font-size:13px;margin-top:8px;font-style:italic;line-height:1.5}
+.dc-count{margin-top:11px;padding-top:10px;border-top:1px solid var(--line-soft);color:var(--amber);font-size:13px;letter-spacing:.4px}
+.dc-loading{font-family:var(--serif);color:var(--ink-dim);font-size:15.5px;font-style:italic}
+.dc-loading::after{content:"…";animation:dots 1.4s steps(4) infinite}
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"…"}}
+.dc-miss{font-family:var(--serif);color:var(--ink-dim);font-size:15px;line-height:1.55;margin-top:6px;font-style:italic}
+.dc-manual{display:flex;gap:8px;margin-top:12px}
+.dc-manual input{
+  flex:1;background:rgba(10,13,32,.6);border:1px solid var(--line);border-radius:var(--r-sm);
+  color:var(--ink);font-family:var(--serif);font-size:15px;padding:9px 13px;
+}
+.dc-manual input:focus{outline:none;border-color:rgba(196,181,253,.5)}
+
+/* ---------- resurfaced card ---------- */
+#resurfaced{
+  position:fixed;left:22px;bottom:100px;z-index:18;width:min(340px,86vw);
+  background:linear-gradient(165deg,rgba(34,30,66,.9),rgba(18,20,48,.9));
+  border:1px solid rgba(242,192,120,.22);border-radius:var(--r-lg);
+  padding:16px 18px 14px;box-shadow:0 14px 44px rgba(2,4,16,.6),0 0 34px rgba(242,192,120,.07);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  animation:resIn 1.1s cubic-bezier(.22,.9,.3,1) both;
+  transition:opacity .8s ease,transform .8s ease;
+}
+#resurfaced.fading{opacity:0;transform:translateY(10px)}
+@keyframes resIn{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
+.rs-label{font-size:11.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--amber);opacity:.85}
+.rs-text{font-family:var(--serif);font-size:16px;line-height:1.5;margin-top:8px;color:var(--ink)}
+.rs-meta{color:var(--ink-faint);font-size:12.5px;margin-top:8px;display:flex;align-items:center}
+.rs-actions{display:flex;gap:10px;margin-top:11px}
+.rs-actions button{min-height:32px;padding:4px 13px;font-size:13px}
+.rs-close{position:absolute;top:8px;right:9px;background:none;border:none;color:var(--ink-faint);font-size:17px;cursor:pointer;padding:5px 8px;border-radius:8px;transition:color .2s}
+.rs-close:hover{color:var(--ink)}
+
+/* ---------- modals ---------- */
+.modal-veil{position:fixed;inset:0;z-index:30;background:rgba(4,6,16,.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fadeIn .3s ease both}
+.modal{
+  position:fixed;z-index:31;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(560px,93vw);max-height:88vh;overflow-y:auto;
+  background:linear-gradient(170deg,#1a1e44,#12152f);
+  border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:0 28px 80px rgba(1,2,10,.75);
+  padding:24px 26px 26px;
+  animation:modalIn .38s cubic-bezier(.22,.9,.3,1) both;
+  scrollbar-width:thin;
+}
+@keyframes modalIn{from{opacity:0;transform:translate(-50%,-47%) scale(.96)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.modal-head h2{font-family:var(--serif);font-weight:500;font-size:23px;letter-spacing:.3px}
+.modal-close{font-size:20px}
+.modal label{display:block;margin-bottom:14px;color:var(--ink-dim);font-size:13.5px;letter-spacing:.4px}
+.modal label input:not([type="checkbox"]),.modal label textarea{
+  display:block;width:100%;margin-top:6px;
+  background:rgba(9,12,30,.65);border:1px solid var(--line);border-radius:var(--r-sm);
+  color:var(--ink);font-family:var(--serif);font-size:16px;padding:10px 13px;line-height:1.5;
+  transition:border-color .25s,box-shadow .25s;resize:vertical;
+}
+.modal label input:focus,.modal label textarea:focus{outline:none;border-color:rgba(242,192,120,.5);box-shadow:0 0 0 3px rgba(242,192,120,.1)}
+.modal input::placeholder,.modal textarea::placeholder{color:var(--ink-faint);font-style:italic}
+.row2{display:grid;grid-template-columns:1fr 110px;gap:12px}
+.form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+.check{display:flex;gap:10px;align-items:flex-start;cursor:pointer;line-height:1.5}
+.check input{width:17px;height:17px;margin-top:2px;accent-color:var(--amber);cursor:pointer;flex:none}
+.hint{color:var(--ink-faint);font-size:12.8px;line-height:1.55;letter-spacing:.2px}
+.set-sec{padding:16px 0;border-top:1px solid var(--line-soft)}
+.set-sec:first-of-type{border-top:none;padding-top:0}
+.set-sec h3{font-family:var(--serif);font-weight:500;font-size:18px;margin-bottom:8px;color:var(--ink)}
+.set-sec .hint{margin-bottom:12px}
+.btn-row{display:flex;gap:9px;flex-wrap:wrap;margin-top:6px}
+#nt-status{margin-top:12px;min-height:18px}
+#nt-status.ok{color:#9fdcac}
+#nt-status.err{color:#f2a3a3}
+
+/* detail modal */
+.dt-star{font-size:22px;margin-bottom:10px;display:inline-block}
+.dt-star.idea{color:var(--amber);text-shadow:0 0 20px rgba(242,192,120,.8)}
+.dt-star.vocab{color:var(--violet);text-shadow:0 0 20px rgba(196,181,253,.8)}
+.dt-text{font-family:var(--serif);font-size:22px;line-height:1.5;color:var(--ink);margin-bottom:8px}
+.dt-block{margin:14px 0;padding:13px 16px;background:rgba(9,12,30,.5);border:1px solid var(--line-soft);border-radius:var(--r-md)}
+.dt-block .db-label{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px}
+.dt-block .db-body{font-family:var(--serif);font-size:15.5px;line-height:1.6;color:var(--ink-dim)}
+.dt-meta{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;color:var(--ink-faint);font-size:13px;margin-top:14px}
+.dt-confirm{display:none;align-items:center;gap:10px;color:var(--ink-dim);font-size:14px}
+.dt-confirm.show{display:flex}
+
+/* export modal */
+.ex-row{display:flex;align-items:center;gap:10px;padding:11px 4px;border-bottom:1px solid var(--line-soft)}
+.ex-row:last-child{border-bottom:none}
+.ex-name{flex:1;font-family:var(--serif);font-size:16px;display:flex;align-items:center;min-width:0}
+.ex-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ex-count{color:var(--ink-faint);font-size:12.5px;white-space:nowrap}
+.ex-row .ghost-btn{min-height:32px;padding:4px 12px;font-size:13px;white-space:nowrap}
+
+/* ---------- toasts ---------- */
+#toasts{position:fixed;top:70px;right:20px;z-index:50;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{
+  background:var(--card-solid);border:1px solid var(--line);border-radius:var(--r-md);
+  padding:11px 17px;color:var(--ink);font-size:14px;box-shadow:var(--shadow);
+  animation:toastIn .4s cubic-bezier(.22,.9,.3,1) both;max-width:320px;line-height:1.45;
+}
+.toast.out{animation:toastOut .45s ease both}
+.toast.err{border-color:rgba(255,130,130,.4)}
+@keyframes toastIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+@keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateY(-8px)}}
+
+/* ---------- responsive ---------- */
+@media (max-width:720px){
+  #topbar{padding:10px 12px;gap:10px}
+  .brand{font-size:17px}
+  .view-btn{padding:7px 12px;font-size:13.5px}
+  #btn-export{display:none}
+  #quickbar{flex-wrap:wrap;border-radius:var(--r-lg);width:calc(100vw - 20px);bottom:10px}
+  #qb-text{flex-basis:100%;order:-1}
+  #qb-book{flex:1;width:auto}
+  .panel{top:64px;bottom:150px;width:calc(100vw - 16px)}
+  #resurfaced{left:10px;bottom:160px}
+  #zoomctl{bottom:170px;right:12px}
+  #dict-card{bottom:150px}
+  .row2{grid-template-columns:1fr 90px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+<div class="nebula" id="neb1"></div>
+<div class="nebula" id="neb2"></div>
+<div class="nebula" id="neb3"></div>
+<canvas id="sky" aria-hidden="true"></canvas>
+<div id="vignette"></div>
+
+<header id="topbar">
+  <div class="brand"><span class="brand-star">✦</span> Constellation</div>
+  <nav class="views" role="tablist" aria-label="View">
+    <button class="view-btn active" data-view="sky" role="tab" aria-selected="true">Sky</button>
+    <button class="view-btn" data-view="list" role="tab" aria-selected="false">Entries</button>
+    <button class="view-btn" data-view="books" role="tab" aria-selected="false">Books</button>
+  </nav>
+  <div class="top-actions">
+    <button class="ghost-btn" id="btn-export" title="Export as Markdown">Export</button>
+    <button class="ghost-btn icon" id="btn-settings" title="Settings" aria-label="Settings">⚙</button>
+  </div>
+</header>
+
+<div id="sky-tooltip" role="status"></div>
+
+<div id="sky-empty" class="hidden">
+  <div class="empty-star">✦</div>
+  <h2>Your sky is waiting</h2>
+  <p>Capture an idea or a new word below — each one becomes a star.
+  Stars from the same book draw themselves into constellations.</p>
+  <button id="btn-sample" class="ghost-btn">Scatter a few sample stars</button>
+</div>
+
+<div id="zoomctl">
+  <button id="zoom-in" aria-label="Zoom in" title="Zoom in">+</button>
+  <button id="zoom-out" aria-label="Zoom out" title="Zoom out">−</button>
+  <button id="zoom-fit" aria-label="Fit everything in view" title="Fit everything">✧</button>
+</div>
+
+<main id="panel-list" class="panel hidden" aria-label="Entries">
+  <div class="panel-head">
+    <input id="search" type="search" placeholder="Search your sky…" aria-label="Search entries" autocomplete="off">
+    <div class="filter-row">
+      <div class="seg" id="type-filter">
+        <button data-type="all" class="active">All</button>
+        <button data-type="idea">✦ Ideas</button>
+        <button data-type="vocab">◦ Words</button>
+      </div>
+      <select id="book-filter" aria-label="Filter by book"><option value="">All books</option></select>
+      <input type="date" id="date-from" aria-label="From date" title="From date">
+      <input type="date" id="date-to" aria-label="To date" title="To date">
+      <button id="clear-filters" class="ghost-btn small hidden">Clear filters</button>
+    </div>
+    <div id="tag-filter" class="tag-row"></div>
+  </div>
+  <div id="entry-list"></div>
+  <div id="list-empty" class="panel-empty hidden">
+    <span class="pe-star">✧</span>
+    <p id="list-empty-msg">Nothing here yet — capture something below.</p>
+  </div>
+</main>
+
+<main id="panel-books" class="panel hidden" aria-label="Books">
+  <div id="book-grid"></div>
+  <div id="books-empty" class="panel-empty hidden">
+    <span class="pe-star">✧</span>
+    <p>No books on the shelf yet.<br>Name a book when you capture an entry, and it will appear here.</p>
+  </div>
+</main>
+
+<div id="dict-card" class="hidden"></div>
+
+<div id="quickbar">
+  <div class="seg" id="qb-type">
+    <button data-qtype="idea" class="active" title="Capture an idea">✦ Idea</button>
+    <button data-qtype="vocab" title="Capture a word">◦ Word</button>
+  </div>
+  <input id="qb-text" autocomplete="off" placeholder="A thought worth keeping…" aria-label="New entry text">
+  <input id="qb-book" autocomplete="off" list="book-datalist" placeholder="Book" aria-label="Book title">
+  <button id="qb-add" title="Add to your sky (Enter)">Add ✦</button>
+  <button id="qb-more" class="icon" title="Add with full details" aria-label="Add with full details">⋯</button>
+</div>
+<datalist id="book-datalist"></datalist>
+
+<aside id="resurfaced" class="hidden" aria-live="polite"></aside>
+
+<div class="modal-veil hidden" id="veil"></div>
+
+<div class="modal hidden" id="modal-entry" role="dialog" aria-modal="true" aria-labelledby="entry-modal-title">
+  <div class="modal-head"><h2 id="entry-modal-title">New entry</h2><button class="icon ghost-btn modal-close" aria-label="Close">×</button></div>
+  <form id="entry-form" novalidate>
+    <div class="seg" id="ef-type" style="margin-bottom:16px">
+      <button type="button" data-eftype="idea" class="active">✦ Idea</button>
+      <button type="button" data-eftype="vocab">◦ Word</button>
+    </div>
+    <label><span id="ef-text-label">The idea</span>
+      <textarea id="ef-text" rows="3" required placeholder="What struck you?"></textarea>
+    </label>
+    <div class="row2">
+      <label>Book <input id="ef-book" list="book-datalist" autocomplete="off" placeholder="Where you found it"></label>
+      <label>Page <input id="ef-page" type="number" min="0" inputmode="numeric" placeholder="—"></label>
+    </div>
+    <label id="ef-why-wrap">Why it matters
+      <textarea id="ef-why" rows="2" placeholder="What it changed, echoed, or opened up for you"></textarea>
+    </label>
+    <label id="ef-def-wrap" class="hidden">Definition
+      <textarea id="ef-def" rows="2" placeholder="Leave empty and I'll consult the dictionary"></textarea>
+    </label>
+    <label id="ef-ctx-wrap" class="hidden">Where you met it
+      <textarea id="ef-ctx" rows="2" placeholder="The sentence or scene where it appeared"></textarea>
+    </label>
+    <label>Tags <input id="ef-tags" autocomplete="off" placeholder="comma, separated, tags"></label>
+    <div class="form-actions">
+      <button type="button" class="ghost-btn modal-close">Cancel</button>
+      <button type="submit" class="primary-btn" id="ef-save">Add to sky ✦</button>
+    </div>
+  </form>
+</div>
+
+<div class="modal hidden" id="modal-detail" role="dialog" aria-modal="true"></div>
+<div class="modal hidden" id="modal-export" role="dialog" aria-modal="true"></div>
+
+<div class="modal hidden" id="modal-settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div class="modal-head"><h2 id="settings-title">Settings</h2><button class="icon ghost-btn modal-close" aria-label="Close">×</button></div>
+  <section class="set-sec">
+    <h3>Notion sync</h3>
+    <p class="hint">Create an internal integration at <b>notion.so/my-integrations</b>, open your target database in Notion, share it with the integration, then paste the token and the database ID (the 32-character string in the database's URL) below. Constellation can add any missing columns for you.</p>
+    <label>Integration token <input id="nt-token" type="password" autocomplete="off" placeholder="ntn_… or secret_…"></label>
+    <label>Database ID <input id="nt-db" autocomplete="off" placeholder="e.g. a1b2c3d4e5f6…"></label>
+    <label class="check"><input type="checkbox" id="nt-proxy"><span>Route through a public CORS proxy<br><span class="hint">Browsers block direct calls to Notion's API from a local page. This routes requests — including your token — through corsproxy.io. Enable only if you accept that; otherwise run Constellation from a small local server.</span></span></label>
+    <label class="check"><input type="checkbox" id="nt-auto"><span>Push new entries automatically</span></label>
+    <div class="btn-row">
+      <button id="nt-test" class="ghost-btn">Test connection</button>
+      <button id="nt-push" class="primary-btn">Push entries to Notion</button>
+    </div>
+    <p id="nt-status" class="hint"></p>
+  </section>
+  <section class="set-sec">
+    <h3>Your data</h3>
+    <p class="hint" id="data-stats"></p>
+    <div class="btn-row">
+      <button id="btn-backup" class="ghost-btn">Download backup</button>
+      <button id="btn-restore" class="ghost-btn">Restore backup</button>
+      <button id="btn-wipe" class="danger-btn">Clear everything</button>
+    </div>
+    <p id="wipe-status" class="hint" style="margin-top:10px"></p>
+  </section>
+</div>
+
+<input type="file" id="cover-file" accept="image/*" class="visually-hidden">
+<input type="file" id="restore-file" accept="application/json,.json" class="visually-hidden">
+<div id="toasts" aria-live="polite"></div>
+<script>
+/* ============================================================
+   Constellation — a night sky of what you've read
+   ============================================================ */
+'use strict';
+
+/* ---------------- utils ---------------- */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+function hashStr(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function fmtDate(ts) {
+  const d = new Date(ts);
+  return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}, ${d.getFullYear()}`;
+}
+function fmtRel(ts) {
+  const s = (Date.now() - ts) / 1000;
+  if (s < 90) return 'just now';
+  if (s < 3600) return `${Math.round(s/60)} min ago`;
+  if (s < 86400 * 1.5) return `${Math.round(s/3600)} hours ago`;
+  const d = Math.round(s / 86400);
+  if (d < 30) return `${d} day${d === 1 ? '' : 's'} ago`;
+  const mo = Math.round(d / 30);
+  if (mo < 12) return `${mo} month${mo === 1 ? '' : 's'} ago`;
+  return fmtDate(ts);
+}
+function ordinal(n) {
+  const s = ['th','st','nd','rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+function download(name, text, mime = 'text/markdown') {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: mime }));
+  a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 800);
+}
+function toast(msg, isErr = false) {
+  const t = document.createElement('div');
+  t.className = 'toast' + (isErr ? ' err' : '');
+  t.textContent = msg;
+  $('#toasts').appendChild(t);
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 500); }, isErr ? 5200 : 3200);
+}
+
+/* ---------------- store ---------------- */
+const DB_KEY = 'constellation.v1';
+let state = {
+  entries: [],   // {id,type,text,book,pageNum,whyItMatters,definition,phonetic,partOfSpeech,origin,contextNote,tags[],createdAt,notionId?}
+  books: {},     // name -> {cover: dataURL}
+  settings: { notionToken: '', notionDb: '', notionProxy: false, autoPush: false },
+};
+function load() {
+  try {
+    const raw = localStorage.getItem(DB_KEY);
+    if (!raw) return;
+    const j = JSON.parse(raw);
+    if (Array.isArray(j.entries)) state.entries = j.entries;
+    if (j.books && typeof j.books === 'object') state.books = j.books;
+    state.settings = Object.assign(state.settings, j.settings || {});
+  } catch (e) { console.warn('Could not load saved data', e); }
+}
+const save = debounce(() => {
+  try { localStorage.setItem(DB_KEY, JSON.stringify(state)); }
+  catch (e) { toast('Storage is full — try removing a large cover image.', true); }
+}, 250);
+
+function addEntry(data) {
+  const entry = {
+    id: uid(),
+    type: data.type === 'vocab' ? 'vocab' : 'idea',
+    text: (data.text || '').trim(),
+    book: (data.book || '').trim(),
+    pageNum: data.pageNum || null,
+    whyItMatters: (data.whyItMatters || '').trim(),
+    definition: (data.definition || '').trim(),
+    phonetic: data.phonetic || '',
+    partOfSpeech: data.partOfSpeech || '',
+    origin: data.origin || '',
+    contextNote: (data.contextNote || '').trim(),
+    tags: (data.tags || []).map(t => t.trim()).filter(Boolean),
+    createdAt: data.createdAt || Date.now(),
+  };
+  const isNewBook = entry.book && !state.entries.some(e => e.book === entry.book);
+  state.entries.push(entry);
+  save();
+  onDataChanged();
+  markReveal(entry, isNewBook);
+  if (state.settings.autoPush && state.settings.notionToken && state.settings.notionDb) {
+    notionPushEntry(entry).then(() => toast('✦ Pushed to Notion'))
+      .catch(err => toast('Notion push failed: ' + err.message, true));
+  }
+  return entry;
+}
+function updateEntry(id, patch) {
+  const e = state.entries.find(x => x.id === id);
+  if (!e) return null;
+  Object.assign(e, patch);
+  if (patch.tags) e.tags = patch.tags.map(t => t.trim()).filter(Boolean);
+  save();
+  onDataChanged();
+  return e;
+}
+function deleteEntry(id) {
+  state.entries = state.entries.filter(e => e.id !== id);
+  save();
+  onDataChanged();
+}
+function derivedBooks() {
+  const map = new Map();
+  for (const e of state.entries) {
+    if (!e.book) continue;
+    if (!map.has(e.book)) map.set(e.book, { name: e.book, ideas: 0, vocab: 0, lastAt: 0, firstAt: Infinity, entries: [] });
+    const b = map.get(e.book);
+    b[e.type === 'vocab' ? 'vocab' : 'ideas']++;
+    b.lastAt = Math.max(b.lastAt, e.createdAt);
+    b.firstAt = Math.min(b.firstAt, e.createdAt);
+    b.entries.push(e);
+  }
+  for (const b of map.values()) b.cover = state.books[b.name]?.cover || null;
+  return [...map.values()];
+}
+function allTags() {
+  const set = new Set();
+  for (const e of state.entries) for (const t of (e.tags || [])) set.add(t);
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+function vocabThisMonth() {
+  const now = new Date();
+  return state.entries.filter(e => {
+    if (e.type !== 'vocab') return false;
+    const d = new Date(e.createdAt);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
+}
+function setBookCover(name, dataUrl) {
+  if (!state.books[name]) state.books[name] = {};
+  state.books[name].cover = dataUrl;
+  save();
+  coverImgCache.delete(name);
+  onDataChanged();
+}
+
+/* called after any data mutation: refresh whatever is visible + sky layout */
+function onDataChanged() {
+  invalidateLayout();
+  refreshBookInputs();
+  if (currentView === 'list') renderList();
+  if (currentView === 'books') renderBooks();
+  updateEmptyState();
+}
+
+/* ---------------- dictionary ---------------- */
+async function lookupWord(word) {
+  const r = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word.toLowerCase()));
+  if (!r.ok) return null;
+  const j = await r.json();
+  const m = Array.isArray(j) && j[0];
+  if (!m) return null;
+  const meaning = (m.meanings || [])[0];
+  const def = meaning?.definitions?.[0]?.definition;
+  if (!def) return null;
+  return {
+    definition: def,
+    phonetic: m.phonetic || (m.phonetics || []).find(p => p.text)?.text || '',
+    partOfSpeech: meaning?.partOfSpeech || '',
+    origin: m.origin || '',
+  };
+}
+
+let dictHideTimer = null;
+function showDictCard(html) {
+  const card = $('#dict-card');
+  card.innerHTML = '<button class="dc-close" aria-label="Dismiss">×</button>' + html;
+  card.classList.remove('hidden');
+  card.querySelector('.dc-close').onclick = hideDictCard;
+  clearTimeout(dictHideTimer);
+}
+function hideDictCard() { $('#dict-card').classList.add('hidden'); clearTimeout(dictHideTimer); }
+
+function dictSuccessHtml(word, d) {
+  const n = vocabThisMonth();
+  return `
+    <div class="dc-word">${esc(word)}
+      ${d.phonetic ? `<span class="dc-phon">${esc(d.phonetic)}</span>` : ''}
+      ${d.partOfSpeech ? `<span class="dc-pos">${esc(d.partOfSpeech)}</span>` : ''}
+    </div>
+    <div class="dc-def">${esc(d.definition)}</div>
+    ${d.origin ? `<div class="dc-origin">${esc(d.origin)}</div>` : ''}
+    <div class="dc-count">✦ Your ${ordinal(n)} word gathered this ${MONTHS[new Date().getMonth()]}</div>`;
+}
+function runDictionaryFlow(entry) {
+  showDictCard(`<div class="dc-word">${esc(entry.text)}</div><div class="dc-loading">Consulting the dictionary</div>`);
+  lookupWord(entry.text).then(d => {
+    if (d) {
+      updateEntry(entry.id, { definition: entry.definition || d.definition, phonetic: d.phonetic, partOfSpeech: d.partOfSpeech, origin: d.origin });
+      showDictCard(dictSuccessHtml(entry.text, d));
+      dictHideTimer = setTimeout(hideDictCard, 14000);
+    } else dictManualFallback(entry);
+  }).catch(() => dictManualFallback(entry));
+}
+function dictManualFallback(entry) {
+  showDictCard(`
+    <div class="dc-word">${esc(entry.text)}</div>
+    <div class="dc-miss">The dictionary hasn't met this one. Give it your own meaning — those stars often shine brightest.</div>
+    <div class="dc-manual">
+      <input id="dc-manual-input" placeholder="Your definition…" aria-label="Your definition">
+      <button id="dc-manual-save" class="primary-btn" style="min-height:38px">Save</button>
+    </div>`);
+  const input = $('#dc-manual-input');
+  const saveDef = () => {
+    const v = input.value.trim();
+    if (v) { updateEntry(entry.id, { definition: v }); toast('Definition saved ✦'); }
+    hideDictCard();
+  };
+  $('#dc-manual-save').onclick = saveDef;
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') saveDef(); });
+  input.focus();
+}
+
+/* ---------------- views ---------------- */
+let currentView = 'sky';
+function setView(v) {
+  currentView = v;
+  $$('.view-btn').forEach(b => {
+    const on = b.dataset.view === v;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on);
+  });
+  $('#panel-list').classList.toggle('hidden', v !== 'list');
+  $('#panel-books').classList.toggle('hidden', v !== 'books');
+  $('#zoomctl').classList.toggle('hidden', v !== 'sky');
+  if (v === 'list') renderList();
+  if (v === 'books') renderBooks();
+  updateEmptyState();
+}
+function updateEmptyState() {
+  $('#sky-empty').classList.toggle('hidden', !(currentView === 'sky' && state.entries.length === 0));
+}
+
+/* ---------------- filters + list ---------------- */
+const F = { q: '', type: 'all', book: '', tags: new Set(), from: '', to: '' };
+function filtersActive() { return F.q || F.type !== 'all' || F.book || F.tags.size || F.from || F.to; }
+function filteredEntries() {
+  const q = F.q.toLowerCase();
+  const fromTs = F.from ? new Date(F.from + 'T00:00:00').getTime() : -Infinity;
+  const toTs = F.to ? new Date(F.to + 'T23:59:59').getTime() : Infinity;
+  return state.entries.filter(e => {
+    if (F.type !== 'all' && e.type !== F.type) return false;
+    if (F.book && e.book !== F.book) return false;
+    if (e.createdAt < fromTs || e.createdAt > toTs) return false;
+    if (F.tags.size && ![...F.tags].every(t => (e.tags || []).includes(t))) return false;
+    if (q) {
+      const hay = [e.text, e.book, e.definition, e.whyItMatters, e.contextNote, (e.tags || []).join(' ')].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  }).sort((a, b) => b.createdAt - a.createdAt);
+}
+function bookThumb(name) {
+  const cover = state.books[name]?.cover;
+  return cover ? `<img class="cover-thumb" src="${cover}" alt="">` : '';
+}
+function renderList() {
+  const list = $('#entry-list');
+  const entries = filteredEntries();
+  $('#clear-filters').classList.toggle('hidden', !filtersActive());
+  renderTagFilter();
+  renderBookFilter();
+  if (!entries.length) {
+    list.innerHTML = '';
+    $('#list-empty').classList.remove('hidden');
+    $('#list-empty-msg').innerHTML = state.entries.length
+      ? 'Nothing matches these filters.<br>Loosen them, or capture something new below.'
+      : 'Your log is empty — capture your first idea or word below.';
+    return;
+  }
+  $('#list-empty').classList.add('hidden');
+  list.innerHTML = entries.map((e, i) => {
+    const isV = e.type === 'vocab';
+    const meta = [];
+    if (e.book) meta.push(`<span class="ec-book">${bookThumb(e.book)}${esc(e.book)}${e.pageNum ? ` · p. ${esc(e.pageNum)}` : ''}</span>`);
+    else if (e.pageNum) meta.push(`<span>p. ${esc(e.pageNum)}</span>`);
+    meta.push(`<span>${fmtRel(e.createdAt)}</span>`);
+    const tags = (e.tags || []).map(t => `<button class="chip" data-tag="${esc(t)}">${esc(t)}</button>`).join('');
+    return `<article class="entry-card" data-id="${e.id}" style="animation-delay:${Math.min(i * 35, 420)}ms" tabindex="0" role="button" aria-label="Open entry">
+      <div class="ec-head"><span class="ec-star ${e.type}">${isV ? '◦' : '✦'}</span><span class="ec-text">${esc(e.text)}</span></div>
+      ${isV && e.definition ? `<div class="ec-def">${esc(e.definition)}</div>` : ''}
+      ${!isV && e.whyItMatters ? `<div class="ec-def">${esc(e.whyItMatters)}</div>` : ''}
+      <div class="ec-meta">${meta.join('')}${tags}</div>
+    </article>`;
+  }).join('');
+  list.querySelectorAll('.entry-card').forEach(card => {
+    const open = () => openDetail(card.dataset.id);
+    card.addEventListener('click', ev => { if (!ev.target.closest('.chip')) open(); });
+    card.addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.target.closest('.chip')) open(); });
+  });
+  list.querySelectorAll('.chip[data-tag]').forEach(ch => ch.addEventListener('click', () => {
+    const t = ch.dataset.tag;
+    F.tags.has(t) ? F.tags.delete(t) : F.tags.add(t);
+    renderList();
+  }));
+}
+function renderTagFilter() {
+  const tags = allTags();
+  $('#tag-filter').innerHTML = tags.map(t =>
+    `<button class="chip ${F.tags.has(t) ? 'active' : ''}" data-ftag="${esc(t)}">${esc(t)}</button>`).join('');
+  $('#tag-filter').querySelectorAll('.chip').forEach(ch => ch.addEventListener('click', () => {
+    const t = ch.dataset.ftag;
+    F.tags.has(t) ? F.tags.delete(t) : F.tags.add(t);
+    renderList();
+  }));
+}
+function renderBookFilter() {
+  const sel = $('#book-filter');
+  const books = derivedBooks().sort((a, b) => b.lastAt - a.lastAt);
+  const cur = F.book;
+  sel.innerHTML = '<option value="">All books</option>' +
+    books.map(b => `<option value="${esc(b.name)}" ${b.name === cur ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
+}
+function refreshBookInputs() {
+  $('#book-datalist').innerHTML = derivedBooks().sort((a, b) => b.lastAt - a.lastAt)
+    .map(b => `<option value="${esc(b.name)}">`).join('');
+}
+function clearFilters() {
+  F.q = ''; F.type = 'all'; F.book = ''; F.tags.clear(); F.from = ''; F.to = '';
+  $('#search').value = ''; $('#date-from').value = ''; $('#date-to').value = '';
+  $$('#type-filter button').forEach(b => b.classList.toggle('active', b.dataset.type === 'all'));
+  renderList();
+}
+
+/* ---------------- books panel ---------------- */
+let coverTargetBook = null;
+function renderBooks() {
+  const grid = $('#book-grid');
+  const books = derivedBooks().sort((a, b) => b.lastAt - a.lastAt);
+  $('#books-empty').classList.toggle('hidden', books.length > 0);
+  grid.innerHTML = books.map((b, i) => {
+    const counts = [
+      b.ideas ? `${b.ideas} idea${b.ideas === 1 ? '' : 's'}` : '',
+      b.vocab ? `${b.vocab} word${b.vocab === 1 ? '' : 's'}` : '',
+    ].filter(Boolean).join(' · ');
+    return `<div class="book-card" style="animation-delay:${Math.min(i * 45, 400)}ms">
+      <div class="bc-top">
+        ${b.cover ? `<img class="bc-cover" src="${b.cover}" alt="Cover of ${esc(b.name)}">`
+                  : `<div class="bc-cover-ph" aria-hidden="true">${esc(b.name[0].toUpperCase())}</div>`}
+        <div style="min-width:0">
+          <div class="bc-name">${esc(b.name)}</div>
+          <div class="bc-counts">${counts}<br>last star ${fmtRel(b.lastAt)}</div>
+        </div>
+      </div>
+      <div class="bc-actions">
+        <button class="ghost-btn" data-act="view" data-book="${esc(b.name)}">View entries</button>
+        <button class="ghost-btn" data-act="cover" data-book="${esc(b.name)}">${b.cover ? 'Change cover' : 'Add cover'}</button>
+        <button class="ghost-btn" data-act="export" data-book="${esc(b.name)}">Export .md</button>
+      </div>
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('button[data-act]').forEach(btn => btn.addEventListener('click', () => {
+    const book = btn.dataset.book;
+    if (btn.dataset.act === 'view') { clearFilters(); F.book = book; setView('list'); }
+    else if (btn.dataset.act === 'cover') { coverTargetBook = book; $('#cover-file').click(); }
+    else if (btn.dataset.act === 'export') { exportBook(book); }
+  }));
+}
+function handleCoverFile(file) {
+  if (!file || !coverTargetBook) return;
+  const img = new Image();
+  img.onload = () => {
+    const maxW = 320;
+    const scale = Math.min(1, maxW / img.width);
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    setBookCover(coverTargetBook, c.toDataURL('image/jpeg', 0.82));
+    toast(`Cover added for “${coverTargetBook}” ✦`);
+    coverTargetBook = null;
+    if (currentView === 'books') renderBooks();
+  };
+  img.onerror = () => toast('That image could not be read.', true);
+  img.src = URL.createObjectURL(file);
+}
+
+/* ---------------- modals ---------------- */
+function openModal(id) {
+  closeModals(false);
+  $('#veil').classList.remove('hidden');
+  $(id).classList.remove('hidden');
+}
+function closeModals(hideVeil = true) {
+  $$('.modal').forEach(m => m.classList.add('hidden'));
+  if (hideVeil) $('#veil').classList.add('hidden');
+}
+
+/* --------- entry form (full add / edit) --------- */
+let efType = 'idea', efEditingId = null;
+function setEfType(t) {
+  efType = t;
+  $$('#ef-type button').forEach(b => b.classList.toggle('active', b.dataset.eftype === t));
+  const isV = t === 'vocab';
+  $('#ef-text-label').textContent = isV ? 'The word' : 'The idea';
+  $('#ef-text').placeholder = isV ? 'The word itself' : 'What struck you?';
+  $('#ef-why-wrap').classList.toggle('hidden', isV);
+  $('#ef-def-wrap').classList.toggle('hidden', !isV);
+  $('#ef-ctx-wrap').classList.toggle('hidden', !isV);
+}
+function openEntryModal(entry = null, presetType = null, presetText = '', presetBook = '') {
+  efEditingId = entry ? entry.id : null;
+  $('#entry-modal-title').textContent = entry ? 'Edit entry' : 'New entry';
+  $('#ef-save').textContent = entry ? 'Save changes ✦' : 'Add to sky ✦';
+  setEfType(entry ? entry.type : (presetType || 'idea'));
+  $('#ef-text').value = entry ? entry.text : presetText;
+  $('#ef-book').value = entry ? entry.book : presetBook;
+  $('#ef-page').value = entry?.pageNum ?? '';
+  $('#ef-why').value = entry?.whyItMatters ?? '';
+  $('#ef-def').value = entry?.definition ?? '';
+  $('#ef-ctx').value = entry?.contextNote ?? '';
+  $('#ef-tags').value = (entry?.tags || []).join(', ');
+  openModal('#modal-entry');
+  setTimeout(() => $('#ef-text').focus(), 60);
+}
+function submitEntryForm() {
+  const text = $('#ef-text').value.trim();
+  if (!text) { $('#ef-text').focus(); return; }
+  const data = {
+    type: efType, text,
+    book: $('#ef-book').value.trim(),
+    pageNum: $('#ef-page').value ? Number($('#ef-page').value) : null,
+    whyItMatters: $('#ef-why').value,
+    definition: $('#ef-def').value,
+    contextNote: $('#ef-ctx').value,
+    tags: $('#ef-tags').value.split(',').map(t => t.trim()).filter(Boolean),
+  };
+  if (efEditingId) {
+    updateEntry(efEditingId, data);
+    toast('Entry updated ✦');
+  } else {
+    const entry = addEntry(data);
+    toast(efType === 'vocab' ? 'A new word joins your sky ◦' : 'A new star appears ✦');
+    if (efType === 'vocab' && !data.definition) runDictionaryFlow(entry);
+    flyToEntry(entry.id);
+  }
+  closeModals();
+}
+
+/* --------- detail modal --------- */
+function openDetail(id) {
+  const e = state.entries.find(x => x.id === id);
+  if (!e) return;
+  const isV = e.type === 'vocab';
+  const blocks = [];
+  if (isV && e.definition) blocks.push(['Definition',
+    `${e.phonetic ? `<span style="color:var(--violet)">${esc(e.phonetic)}</span> ` : ''}${e.partOfSpeech ? `<i>${esc(e.partOfSpeech)}</i> — ` : ''}${esc(e.definition)}`]);
+  if (isV && e.origin) blocks.push(['Origin', esc(e.origin)]);
+  if (isV && e.contextNote) blocks.push(['Where you met it', esc(e.contextNote)]);
+  if (!isV && e.whyItMatters) blocks.push(['Why it matters', esc(e.whyItMatters)]);
+  const meta = [];
+  if (e.book) meta.push(`<span class="ec-book">${bookThumb(e.book)}${esc(e.book)}${e.pageNum ? ` · p. ${esc(e.pageNum)}` : ''}</span>`);
+  else if (e.pageNum) meta.push(`<span>p. ${esc(e.pageNum)}</span>`);
+  meta.push(`<span>${fmtDate(e.createdAt)}</span>`);
+  const tags = (e.tags || []).map(t => `<span class="chip active" style="cursor:default">${esc(t)}</span>`).join(' ');
+  $('#modal-detail').innerHTML = `
+    <div class="modal-head">
+      <span class="dt-star ${e.type}">${isV ? '◦' : '✦'}</span>
+      <button class="icon ghost-btn modal-close" aria-label="Close">×</button>
+    </div>
+    <div class="dt-text">${esc(e.text)}</div>
+    ${blocks.map(([l, b]) => `<div class="dt-block"><div class="db-label">${l}</div><div class="db-body">${b}</div></div>`).join('')}
+    <div class="dt-meta">${meta.join('')} ${tags}</div>
+    <div class="form-actions">
+      <span class="dt-confirm" id="dt-confirm">Release this star?
+        <button class="danger-btn" id="dt-del-yes" style="min-height:32px;padding:3px 12px">Release</button>
+        <button class="ghost-btn small" id="dt-del-no">Keep</button>
+      </span>
+      <button class="danger-btn" id="dt-delete">Delete</button>
+      <button class="ghost-btn" id="dt-edit">Edit</button>
+    </div>`;
+  openModal('#modal-detail');
+  $('#dt-edit').onclick = () => openEntryModal(e);
+  $('#dt-delete').onclick = () => { $('#dt-confirm').classList.add('show'); $('#dt-delete').classList.add('hidden'); };
+  $('#dt-del-no').onclick = () => { $('#dt-confirm').classList.remove('show'); $('#dt-delete').classList.remove('hidden'); };
+  $('#dt-del-yes').onclick = () => { deleteEntry(e.id); closeModals(); toast('The star fades back into the dark.'); };
+  wireModalCloses();
+}
+
+/* --------- export --------- */
+function entryMd(e) {
+  const lines = [];
+  if (e.type === 'vocab') {
+    let head = `- **${e.text}**`;
+    if (e.phonetic) head += ` *${e.phonetic}*`;
+    if (e.definition) head += ` — ${e.definition}`;
+    lines.push(head);
+    if (e.contextNote) lines.push(`    - *Context:* ${e.contextNote}`);
+  } else {
+    lines.push(e.pageNum ? `- (p. ${e.pageNum}) ${e.text}` : `- ${e.text}`);
+    if (e.whyItMatters) lines.push(`    - *Why it matters:* ${e.whyItMatters}`);
+  }
+  if (e.type === 'vocab' && e.pageNum) lines.push(`    - *Page:* ${e.pageNum}`);
+  if (e.tags?.length) lines.push(`    - Tags: ${e.tags.map(t => '#' + t.replace(/\s+/g, '-')).join(' ')}`);
+  return lines.join('\n');
+}
+function bookSectionMd(name, entries) {
+  const ideas = entries.filter(e => e.type !== 'vocab').sort((a, b) => (a.pageNum || 0) - (b.pageNum || 0));
+  const vocab = entries.filter(e => e.type === 'vocab').sort((a, b) => a.text.localeCompare(b.text));
+  const parts = [`## ${name}`];
+  if (ideas.length) parts.push('### ✦ Ideas\n' + ideas.map(entryMd).join('\n'));
+  if (vocab.length) parts.push('### ◦ Vocabulary\n' + vocab.map(entryMd).join('\n'));
+  return parts.join('\n\n');
+}
+function buildMd(bookName = null) {
+  const today = fmtDate(Date.now());
+  if (bookName) {
+    const entries = state.entries.filter(e => e.book === bookName);
+    return `# ${bookName} — Reading Log\n\n_Exported from Constellation · ${today}_\n\n` +
+      bookSectionMd(bookName, entries).split('\n').slice(1).join('\n').trim() + '\n';
+  }
+  const books = derivedBooks().sort((a, b) => b.lastAt - a.lastAt);
+  const loose = state.entries.filter(e => !e.book);
+  const parts = [`# Constellation — Reading Log\n\n_Exported ${today} · ${state.entries.length} entries_`];
+  for (const b of books) parts.push(bookSectionMd(b.name, b.entries));
+  if (loose.length) parts.push(bookSectionMd('Unfiled', loose).replace('## Unfiled', '## Unfiled stars'));
+  return parts.join('\n\n---\n\n') + '\n';
+}
+const mdSlug = s => s.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'book';
+function exportBook(name) {
+  download(`${mdSlug(name)}.md`, buildMd(name));
+  toast(`Exported “${name}” as Markdown ✦`);
+}
+function openExportModal() {
+  const books = derivedBooks().sort((a, b) => b.lastAt - a.lastAt);
+  $('#modal-export').innerHTML = `
+    <div class="modal-head"><h2>Export as Markdown</h2><button class="icon ghost-btn modal-close" aria-label="Close">×</button></div>
+    <p class="hint" style="margin-bottom:12px">Clean Markdown, ready for Obsidian or Notion import — or copy it straight into Apple Notes.</p>
+    <div class="ex-row">
+      <div class="ex-name"><span>✦ Everything</span></div>
+      <span class="ex-count">${state.entries.length} entries</span>
+      <button class="ghost-btn" id="ex-all-dl" ${state.entries.length ? '' : 'disabled'}>Download</button>
+      <button class="ghost-btn" id="ex-all-copy" ${state.entries.length ? '' : 'disabled'}>Copy</button>
+    </div>
+    ${books.map((b, i) => `<div class="ex-row">
+      <div class="ex-name">${b.cover ? `<img class="cover-thumb" src="${b.cover}" alt="">` : ''}<span>${esc(b.name)}</span></div>
+      <span class="ex-count">${b.entries.length} entries</span>
+      <button class="ghost-btn" data-exbook="${esc(b.name)}">Download</button>
+    </div>`).join('')}`;
+  openModal('#modal-export');
+  $('#ex-all-dl').onclick = () => { download('constellation-reading-log.md', buildMd()); toast(`Exported ${state.entries.length} entries ✦`); };
+  $('#ex-all-copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(buildMd()); toast('Copied — paste it anywhere, like Apple Notes ✦'); }
+    catch { toast('Clipboard unavailable — use Download instead.', true); }
+  };
+  $('#modal-export').querySelectorAll('[data-exbook]').forEach(btn =>
+    btn.addEventListener('click', () => exportBook(btn.dataset.exbook)));
+  wireModalCloses();
+}
+
+/* ---------------- Notion integration ---------------- */
+const NOTION_VERSION = '2022-06-28';
+const NOTION_PROPS = {
+  'Type': { select: {} }, 'Book': { select: {} }, 'Tags': { multi_select: {} },
+  'Page': { number: {} }, 'Definition': { rich_text: {} },
+  'Why it matters': { rich_text: {} }, 'Context': { rich_text: {} }, 'Created': { date: {} },
+};
+function ntStatus(msg, cls = '') { const el = $('#nt-status'); el.textContent = msg; el.className = 'hint ' + cls; }
+async function notionFetch(path, opts = {}) {
+  const { notionToken, notionProxy } = state.settings;
+  let url = 'https://api.notion.com' + path;
+  if (notionProxy) url = 'https://corsproxy.io/?url=' + encodeURIComponent(url);
+  let r;
+  try {
+    r = await fetch(url, {
+      ...opts,
+      headers: {
+        'Authorization': 'Bearer ' + notionToken,
+        'Notion-Version': NOTION_VERSION,
+        'Content-Type': 'application/json',
+      },
+    });
+  } catch (err) {
+    throw new Error('The browser blocked the request (CORS). Notion\'s API doesn\'t allow direct browser calls — enable the proxy option above, or serve Constellation from a local server.');
+  }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.message || `Notion returned ${r.status}`);
+  return j;
+}
+function cleanDbId() { return (state.settings.notionDb || '').replace(/[^a-f0-9]/gi, ''); }
+async function notionTest() {
+  if (!state.settings.notionToken || !cleanDbId()) { ntStatus('Enter a token and database ID first.', 'err'); return; }
+  ntStatus('Reaching Notion…');
+  try {
+    const db = await notionFetch('/v1/databases/' + cleanDbId());
+    const missing = Object.keys(NOTION_PROPS).filter(k => !db.properties[k]);
+    const title = db.title?.[0]?.plain_text || 'your database';
+    if (missing.length) {
+      ntStatus(`Connected to “${title}”. Adding missing columns: ${missing.join(', ')}…`);
+      const patch = {};
+      for (const k of missing) patch[k] = NOTION_PROPS[k];
+      await notionFetch('/v1/databases/' + cleanDbId(), { method: 'PATCH', body: JSON.stringify({ properties: patch }) });
+      ntStatus(`Connected to “${title}” — columns ready. You're set to push.`, 'ok');
+    } else {
+      ntStatus(`Connected to “${title}” — everything is ready.`, 'ok');
+    }
+  } catch (err) { ntStatus(err.message, 'err'); }
+}
+function notionProps(e) {
+  const clip = (s, n) => String(s).slice(0, n);
+  const p = {
+    'Name': { title: [{ text: { content: clip(e.text || 'Untitled', 200) } }] },
+    'Type': { select: { name: e.type === 'vocab' ? 'Vocabulary' : 'Idea' } },
+    'Created': { date: { start: new Date(e.createdAt).toISOString() } },
+  };
+  if (e.book) p['Book'] = { select: { name: clip(e.book.replace(/,/g, ' '), 100) } };
+  if (e.tags?.length) p['Tags'] = { multi_select: e.tags.map(t => ({ name: clip(t.replace(/,/g, ' '), 100) })) };
+  if (e.pageNum != null && e.pageNum !== '') p['Page'] = { number: Number(e.pageNum) };
+  const rt = v => ({ rich_text: [{ text: { content: clip(v, 1900) } }] });
+  if (e.definition) p['Definition'] = rt(e.definition);
+  if (e.whyItMatters) p['Why it matters'] = rt(e.whyItMatters);
+  if (e.contextNote) p['Context'] = rt(e.contextNote);
+  return p;
+}
+async function notionPushEntry(e) {
+  const children = [];
+  const para = t => ({ object: 'block', type: 'paragraph', paragraph: { rich_text: [{ text: { content: String(t).slice(0, 1900) } }] } });
+  children.push(para(e.text));
+  if (e.whyItMatters) children.push(para('Why it matters: ' + e.whyItMatters));
+  if (e.contextNote) children.push({ object: 'block', type: 'quote', quote: { rich_text: [{ text: { content: String(e.contextNote).slice(0, 1900) } }] } });
+  const page = await notionFetch('/v1/pages', {
+    method: 'POST',
+    body: JSON.stringify({ parent: { database_id: cleanDbId() }, properties: notionProps(e), children }),
+  });
+  e.notionId = page.id;
+  save();
+  return page;
+}
+async function notionPushAll() {
+  if (!state.settings.notionToken || !cleanDbId()) { ntStatus('Enter a token and database ID first.', 'err'); return; }
+  const pending = state.entries.filter(e => !e.notionId);
+  if (!pending.length) { ntStatus('Everything is already in Notion — nothing new to push.', 'ok'); return; }
+  const btn = $('#nt-push'); btn.disabled = true;
+  let done = 0;
+  try {
+    for (const e of pending) {
+      ntStatus(`Pushing ${done + 1} of ${pending.length}…`);
+      await notionPushEntry(e);
+      done++;
+      await new Promise(r => setTimeout(r, 320)); // stay under Notion's rate limit
+    }
+    ntStatus(`Pushed ${done} entr${done === 1 ? 'y' : 'ies'} to Notion ✦`, 'ok');
+    toast(`Pushed ${done} entr${done === 1 ? 'y' : 'ies'} to Notion ✦`);
+  } catch (err) {
+    ntStatus(`Pushed ${done} of ${pending.length}, then: ${err.message}`, 'err');
+  } finally { btn.disabled = false; }
+}
+
+/* ---------------- settings / data ---------------- */
+function openSettings() {
+  $('#nt-token').value = state.settings.notionToken;
+  $('#nt-db').value = state.settings.notionDb;
+  $('#nt-proxy').checked = !!state.settings.notionProxy;
+  $('#nt-auto').checked = !!state.settings.autoPush;
+  ntStatus('');
+  $('#wipe-status').textContent = '';
+  const kb = Math.max(1, Math.round((localStorage.getItem(DB_KEY) || '').length / 1024));
+  const nBooks = derivedBooks().length;
+  $('#data-stats').textContent =
+    `${state.entries.length} entr${state.entries.length === 1 ? 'y' : 'ies'} across ${nBooks} book${nBooks === 1 ? '' : 's'}, stored privately in this browser (~${kb} KB). Nothing leaves this device unless you push to Notion.`;
+  openModal('#modal-settings');
+}
+let wipeArmed = false;
+function wireSettings() {
+  const persist = () => {
+    state.settings.notionToken = $('#nt-token').value.trim();
+    state.settings.notionDb = $('#nt-db').value.trim();
+    state.settings.notionProxy = $('#nt-proxy').checked;
+    state.settings.autoPush = $('#nt-auto').checked;
+    save();
+  };
+  ['#nt-token', '#nt-db'].forEach(s => $(s).addEventListener('input', persist));
+  ['#nt-proxy', '#nt-auto'].forEach(s => $(s).addEventListener('change', persist));
+  $('#nt-test').addEventListener('click', () => { persist(); notionTest(); });
+  $('#nt-push').addEventListener('click', () => { persist(); notionPushAll(); });
+  $('#btn-backup').addEventListener('click', () => {
+    download('constellation-backup.json', JSON.stringify(state, null, 2), 'application/json');
+    toast('Backup downloaded ✦');
+  });
+  $('#btn-restore').addEventListener('click', () => $('#restore-file').click());
+  $('#restore-file').addEventListener('change', ev => {
+    const f = ev.target.files[0]; ev.target.value = '';
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      try {
+        const j = JSON.parse(rd.result);
+        if (!Array.isArray(j.entries)) throw new Error('not a Constellation backup');
+        state.entries = j.entries;
+        state.books = j.books || {};
+        state.settings = Object.assign(state.settings, j.settings || {});
+        save(); onDataChanged(); fitView();
+        openSettings();
+        toast(`Restored ${state.entries.length} entries ✦`);
+      } catch { toast('That file doesn\'t look like a Constellation backup.', true); }
+    };
+    rd.readAsText(f);
+  });
+  $('#btn-wipe').addEventListener('click', () => {
+    if (!wipeArmed) {
+      wipeArmed = true;
+      $('#wipe-status').textContent = 'This erases every entry, book, and cover on this device. Click again to confirm.';
+      $('#btn-wipe').textContent = 'Yes, clear everything';
+      setTimeout(() => { wipeArmed = false; $('#btn-wipe').textContent = 'Clear everything'; $('#wipe-status').textContent = ''; }, 6000);
+    } else {
+      wipeArmed = false;
+      state.entries = []; state.books = {};
+      save(); onDataChanged(); closeModals(); setView('sky'); fitView();
+      toast('The sky is dark again.');
+    }
+  });
+}
+
+/* ---------------- resurfaced entry ---------------- */
+function showResurfaced() {
+  const dayOld = state.entries.filter(e => Date.now() - e.createdAt > 20 * 3600 * 1000);
+  const pool = dayOld.length ? dayOld : state.entries;
+  if (!pool.length) return;
+  const e = pool[Math.floor(Math.random() * pool.length)];
+  const el = $('#resurfaced');
+  el.innerHTML = `
+    <button class="rs-close" aria-label="Dismiss">×</button>
+    <div class="rs-label">✦ From your sky</div>
+    <div class="rs-text">${esc(e.text.length > 130 ? e.text.slice(0, 130) + '…' : e.text)}</div>
+    <div class="rs-meta">${e.book ? `${bookThumb(e.book)}${esc(e.book)} · ` : ''}${fmtRel(e.createdAt)}</div>
+    <div class="rs-actions"><button class="ghost-btn" id="rs-open">Revisit</button></div>`;
+  el.classList.remove('hidden');
+  const dismiss = () => { el.classList.add('fading'); setTimeout(() => { el.classList.add('hidden'); el.classList.remove('fading'); }, 850); };
+  el.querySelector('.rs-close').onclick = dismiss;
+  $('#rs-open').onclick = () => { openDetail(e.id); dismiss(); };
+  setTimeout(dismiss, 26000);
+}
+/* ============================================================
+   The sky — canvas engine
+   ============================================================ */
+const canvas = $('#sky');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const cam = { x: 0, y: 0, z: 1 };
+let camTarget = null;               // {x,y,z} for smooth fly-to; cancelled by user drag
+const reveals = new Map();          // entryId -> timestamp of birth animation
+const clusterReveals = new Map();   // bookName -> timestamp
+const coverImgCache = new Map();    // bookName -> HTMLImageElement | 'loading'
+
+function markReveal(entry, isNewBook) {
+  reveals.set(entry.id, performance.now());
+  if (isNewBook) clusterReveals.set(entry.book, performance.now());
+  invalidateLayout();
+}
+
+function resizeCanvas() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', resizeCanvas);
+
+/* --------- ambient starfield (3 parallax layers) --------- */
+const AMBIENT_LAYERS = [
+  { n: 150, pf: 0.12, sMin: 0.4, sMax: 1.0, alpha: 0.5 },
+  { n: 110, pf: 0.30, sMin: 0.5, sMax: 1.3, alpha: 0.65 },
+  { n: 70,  pf: 0.55, sMin: 0.7, sMax: 1.7, alpha: 0.8 },
+];
+const ambient = AMBIENT_LAYERS.map((L, li) => {
+  const rnd = mulberry32(0xA5C0 + li * 977);
+  return { ...L, stars: Array.from({ length: L.n }, () => ({
+    x: rnd() * 3000, y: rnd() * 2000,
+    r: L.sMin + rnd() * (L.sMax - L.sMin),
+    phase: rnd() * Math.PI * 2, speed: 0.4 + rnd() * 1.2,
+    warm: rnd() < 0.22,
+  })) };
+});
+function drawAmbient(t) {
+  const period = 3000, periodY = 2000;
+  for (const layer of ambient) {
+    const zf = 1 + (cam.z - 1) * layer.pf * 0.5;
+    const ox = cam.x * layer.pf * zf, oy = cam.y * layer.pf * zf;
+    for (const s of layer.stars) {
+      let sx = (s.x - ox) % period; if (sx < 0) sx += period;
+      let sy = (s.y - oy) % periodY; if (sy < 0) sy += periodY;
+      sx = sx / period * (W + 120) - 60;
+      sy = sy / periodY * (H + 120) - 60;
+      const tw = reducedMotion ? 0.85 : 0.68 + 0.32 * Math.sin(t * 0.001 * s.speed + s.phase);
+      ctx.globalAlpha = layer.alpha * tw;
+      ctx.fillStyle = s.warm ? '#f5d9a8' : '#cdd3f5';
+      ctx.beginPath();
+      ctx.arc(sx, sy, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* --------- shooting stars --------- */
+let shooting = null, nextShootAt = performance.now() + 5000;
+function drawShooting(t) {
+  if (reducedMotion) return;
+  if (!shooting && t > nextShootAt) {
+    const rnd = Math.random;
+    shooting = {
+      x0: rnd() * W * 0.8, y0: rnd() * H * 0.4,
+      ang: Math.PI * (0.12 + rnd() * 0.14), len: 130 + rnd() * 120,
+      start: t, dur: 900 + rnd() * 500,
+    };
+    nextShootAt = t + 7000 + rnd() * 12000;
+  }
+  if (!shooting) return;
+  const p = (t - shooting.start) / shooting.dur;
+  if (p >= 1) { shooting = null; return; }
+  const dist = p * (W * 0.55);
+  const hx = shooting.x0 + Math.cos(shooting.ang) * dist;
+  const hy = shooting.y0 + Math.sin(shooting.ang) * dist;
+  const fade = p < 0.15 ? p / 0.15 : (1 - p) / 0.85;
+  const tail = shooting.len * (0.5 + fade * 0.5);
+  const g = ctx.createLinearGradient(hx, hy, hx - Math.cos(shooting.ang) * tail, hy - Math.sin(shooting.ang) * tail);
+  g.addColorStop(0, `rgba(240,235,255,${0.85 * fade})`);
+  g.addColorStop(1, 'rgba(240,235,255,0)');
+  ctx.strokeStyle = g;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(hx, hy);
+  ctx.lineTo(hx - Math.cos(shooting.ang) * tail, hy - Math.sin(shooting.ang) * tail);
+  ctx.stroke();
+}
+
+/* --------- constellation layout --------- */
+let layoutCache = null;
+function invalidateLayout() { layoutCache = null; }
+function getLayout() {
+  if (layoutCache) return layoutCache;
+  const byBook = new Map();
+  const loose = [];
+  for (const e of state.entries) {
+    const b = (e.book || '').trim();
+    if (b) {
+      if (!byBook.has(b)) byBook.set(b, { ideas: [], vocab: [] });
+      byBook.get(b)[e.type === 'vocab' ? 'vocab' : 'ideas'].push(e);
+    } else loose.push(e);
+  }
+  const books = [...byBook.entries()]
+    .map(([name, g]) => ({ name, g, first: Math.min(...[...g.ideas, ...g.vocab].map(e => e.createdAt)) }))
+    .sort((a, b) => a.first - b.first);
+
+  const pts = new Map(), edges = [], clusters = [];
+  books.forEach((bk, i) => {
+    const rnd = mulberry32(hashStr(bk.name));
+    const ang = i * 2.399963 + (rnd() - 0.5) * 0.7;
+    const rad = i === 0 ? 0 : (250 + 200 * Math.sqrt(i)) * (0.88 + rnd() * 0.28);
+    const cx = Math.cos(ang) * rad, cy = Math.sin(ang) * rad * 0.72;
+    const nIdeas = bk.g.ideas.length;
+    const cr = 62 + 30 * Math.sqrt(Math.max(nIdeas, 1));
+    const placed = [];
+    [...bk.g.ideas].sort((a, b) => a.createdAt - b.createdAt).forEach((e, j) => {
+      const r2 = mulberry32(hashStr(e.id));
+      let x, y;
+      if (j === 0) { x = cx + (r2() - 0.5) * 24; y = cy + (r2() - 0.5) * 24; }
+      else {
+        const a2 = r2() * Math.PI * 2;
+        const rr = cr * (0.35 + 0.65 * Math.sqrt(r2()));
+        x = cx + Math.cos(a2) * rr; y = cy + Math.sin(a2) * rr * 0.85;
+      }
+      const p = { x, y, e, size: 2.7 + r2() * 1.5, phase: r2() * 6.28, speed: 0.5 + r2() * 1.1, kind: 'idea', book: bk.name };
+      if (placed.length) {
+        let best = null, bd = Infinity;
+        for (const q of placed) { const d = (q.x - x) ** 2 + (q.y - y) ** 2; if (d < bd) { bd = d; best = q; } }
+        edges.push({ a: p, b: best });
+      }
+      placed.push(p); pts.set(e.id, p);
+    });
+    if (placed.length >= 6) {           // richer web once a constellation matures
+      const r3 = mulberry32(hashStr(bk.name) ^ 0x9E3779B9);
+      for (let k = 0, extra = Math.floor(placed.length / 3); k < extra; k++) {
+        const a = placed[Math.floor(r3() * placed.length)];
+        const b = placed[Math.floor(r3() * placed.length)];
+        if (a !== b) edges.push({ a, b, faint: true });
+      }
+    }
+    bk.g.vocab.forEach(e => {           // vocabulary: a dim halo scattered around the cluster
+      const r2 = mulberry32(hashStr(e.id));
+      const a2 = r2() * Math.PI * 2;
+      const rr = cr * (1.35 + r2() * 0.85);
+      pts.set(e.id, { x: cx + Math.cos(a2) * rr, y: cy + Math.sin(a2) * rr * 0.85, e, size: 1.5 + r2() * 0.9, phase: r2() * 6.28, speed: 0.8 + r2() * 1.4, kind: 'vocab', book: bk.name });
+    });
+    clusters.push({ name: bk.name, x: cx, y: cy, r: cr, nIdeas, total: nIdeas + bk.g.vocab.length });
+  });
+  const maxR = books.length ? 400 + 200 * Math.sqrt(books.length) : 320;
+  loose.forEach(e => {
+    const r2 = mulberry32(hashStr(e.id));
+    const a2 = r2() * Math.PI * 2;
+    const rr = maxR * (0.3 + 0.75 * r2());
+    const isV = e.type === 'vocab';
+    pts.set(e.id, {
+      x: Math.cos(a2) * rr, y: Math.sin(a2) * rr * 0.72, e,
+      size: isV ? 1.5 + r2() : 2.5 + r2() * 1.3,
+      phase: r2() * 6.28, speed: 0.6 + r2(), kind: isV ? 'vocab' : 'idea', book: null,
+    });
+  });
+  layoutCache = { pts, edges, clusters };
+  return layoutCache;
+}
+
+/* --------- camera --------- */
+const w2sX = x => (x - cam.x) * cam.z + W / 2;
+const w2sY = y => (y - cam.y) * cam.z + H / 2;
+const s2wX = x => (x - W / 2) / cam.z + cam.x;
+const s2wY = y => (y - H / 2) / cam.z + cam.y;
+
+function fitView(animate = false) {
+  const { pts } = getLayout();
+  if (!pts.size) {
+    const t = { x: 0, y: 0, z: 1 };
+    if (animate) camTarget = t; else Object.assign(cam, t);
+    return;
+  }
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of pts.values()) {
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+  }
+  const pad = 150;
+  const bw = (maxX - minX) + pad * 2, bh = (maxY - minY) + pad * 2;
+  const z = Math.max(0.28, Math.min(W / bw, (H - 180) / bh, 1.5));
+  const t = { x: (minX + maxX) / 2, y: (minY + maxY) / 2, z };
+  if (animate) camTarget = t; else { Object.assign(cam, t); camTarget = null; }
+}
+function flyToEntry(id) {
+  if (currentView !== 'sky') return;
+  const p = getLayout().pts.get(id);
+  if (!p) return;
+  const sx = w2sX(p.x), sy = w2sY(p.y);
+  const margin = 90;
+  if (sx < margin || sx > W - margin || sy < margin + 60 || sy > H - margin - 60) {
+    camTarget = { x: p.x, y: p.y, z: Math.max(cam.z, 0.7) };
+  }
+}
+
+/* --------- drawing the constellations --------- */
+function starGlow(x, y, r, coreColor, glowColor, alpha) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r * 5);
+  g.addColorStop(0, glowColor);
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.globalAlpha = alpha * 0.55;
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r * 5, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = coreColor;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+function getCoverImg(book) {
+  const url = state.books[book]?.cover;
+  if (!url) return null;
+  let img = coverImgCache.get(book);
+  if (!img) {
+    img = new Image();
+    img.src = url;
+    coverImgCache.set(book, img);
+  }
+  return img.complete && img.naturalWidth ? img : null;
+}
+let hoverPoint = null;
+function drawConstellation(t) {
+  const { pts, edges, clusters } = getLayout();
+  const dimmed = currentView !== 'sky';
+  const master = dimmed ? 0.32 : 1;
+
+  // cluster glow + cover + label
+  for (const c of clusters) {
+    const sx = w2sX(c.x), sy = w2sY(c.y), sr = c.r * cam.z;
+    if (sx < -sr * 3 || sx > W + sr * 3 || sy < -sr * 3 || sy > H + sr * 3) continue;
+    let ripple = 0;
+    const cr0 = clusterReveals.get(c.name);
+    if (cr0 != null) {
+      const p = (t - cr0) / 1800;
+      if (p < 1) ripple = 1 - p; else clusterReveals.delete(c.name);
+    }
+    const glowStrength = Math.min(0.16, 0.05 + c.total * 0.012) + ripple * 0.2;
+    const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr * 1.7);
+    g.addColorStop(0, `rgba(122,110,225,${glowStrength * master})`);
+    g.addColorStop(1, 'rgba(122,110,225,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(sx, sy, sr * 1.7, 0, Math.PI * 2); ctx.fill();
+
+    const img = getCoverImg(c.name);
+    if (img) {
+      const rr = Math.min(34, Math.max(18, sr * 0.42));
+      ctx.save();
+      ctx.globalAlpha = 0.5 * master;
+      ctx.beginPath(); ctx.arc(sx, sy, rr, 0, Math.PI * 2); ctx.clip();
+      const ratio = Math.max((rr * 2) / img.width, (rr * 2) / img.height);
+      ctx.drawImage(img, sx - img.width * ratio / 2, sy - img.height * ratio / 2, img.width * ratio, img.height * ratio);
+      ctx.restore();
+      ctx.globalAlpha = 0.35 * master;
+      ctx.strokeStyle = 'rgba(220,215,255,.6)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(sx, sy, rr, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    if (cam.z > 0.42 && !dimmed) {
+      ctx.globalAlpha = Math.min(1, (cam.z - 0.42) * 3) * 0.6;
+      ctx.fillStyle = '#c9c9e8';
+      ctx.font = '600 11.5px ' + '"Avenir Next","Segoe UI",system-ui,sans-serif';
+      ctx.textAlign = 'center';
+      try { ctx.letterSpacing = '2.5px'; } catch (_) {}
+      ctx.fillText(c.name.toUpperCase(), sx, sy + sr + 22);
+      try { ctx.letterSpacing = '0px'; } catch (_) {}
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // edges
+  for (const ed of edges) {
+    const ax = w2sX(ed.a.x), ay = w2sY(ed.a.y), bx = w2sX(ed.b.x), by = w2sY(ed.b.y);
+    let alpha = (ed.faint ? 0.10 : 0.30) * master;
+    const rev = Math.max(reveals.get(ed.a.e.id) || 0, reveals.get(ed.b.e.id) || 0);
+    if (rev) { const p = Math.min(1, (t - rev) / 1400); alpha *= p; }
+    const g = ctx.createLinearGradient(ax, ay, bx, by);
+    g.addColorStop(0, `rgba(196,190,255,${alpha})`);
+    g.addColorStop(0.5, `rgba(230,214,190,${alpha * 1.25})`);
+    g.addColorStop(1, `rgba(196,190,255,${alpha})`);
+    ctx.strokeStyle = g;
+    ctx.lineWidth = ed.faint ? 0.6 : 1;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  }
+
+  // stars
+  for (const p of pts.values()) {
+    const sx = w2sX(p.x), sy = w2sY(p.y);
+    if (sx < -60 || sx > W + 60 || sy < -60 || sy > H + 60) {
+      const r0 = reveals.get(p.e.id); if (r0 && t - r0 > 1600) reveals.delete(p.e.id);
+      continue;
+    }
+    const isIdea = p.kind === 'idea';
+    const tw = reducedMotion ? 0.88 : 0.72 + 0.28 * Math.sin(t * 0.0011 * p.speed + p.phase);
+    let r = p.size * Math.max(cam.z, 0.6) * (isIdea ? 1 : 0.8);
+    let alpha = (isIdea ? 0.95 : 0.6) * tw * master;
+
+    const r0 = reveals.get(p.e.id);
+    if (r0 != null) {
+      const pr = (t - r0) / 1400;
+      if (pr < 1) {
+        const ease = 1 - Math.pow(1 - pr, 3);
+        r *= (2.6 - 1.6 * ease);
+        alpha = Math.min(1, alpha + (1 - ease) * 0.6);
+        ctx.globalAlpha = (1 - pr) * 0.5 * master;
+        ctx.strokeStyle = isIdea ? 'rgba(242,192,120,.9)' : 'rgba(196,181,253,.9)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(sx, sy, r * (1 + pr * 5), 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else reveals.delete(p.e.id);
+    }
+    if (hoverPoint === p) { r *= 1.5; alpha = Math.min(1, alpha * 1.5); }
+    starGlow(sx, sy, r,
+      isIdea ? '#ffeccb' : '#e2d9ff',
+      isIdea ? 'rgba(242,192,120,.85)' : 'rgba(170,150,250,.8)',
+      alpha);
+  }
+}
+
+/* --------- main loop --------- */
+function frame(t) {
+  ctx.clearRect(0, 0, W, H);
+  if (camTarget) {
+    cam.x += (camTarget.x - cam.x) * 0.075;
+    cam.y += (camTarget.y - cam.y) * 0.075;
+    cam.z += (camTarget.z - cam.z) * 0.075;
+    if (Math.abs(camTarget.x - cam.x) < 0.5 && Math.abs(camTarget.y - cam.y) < 0.5 && Math.abs(camTarget.z - cam.z) < 0.004) camTarget = null;
+  }
+  drawAmbient(t);
+  drawShooting(t);
+  drawConstellation(t);
+  requestAnimationFrame(frame);
+}
+
+/* --------- pointer interaction --------- */
+const pointers = new Map();
+let dragMoved = 0, pinchDist = 0;
+function hitTest(mx, my) {
+  const { pts } = getLayout();
+  let best = null, bd = Infinity;
+  for (const p of pts.values()) {
+    const dx = w2sX(p.x) - mx, dy = w2sY(p.y) - my;
+    const d = dx * dx + dy * dy;
+    const rad = Math.max(13, p.size * cam.z + 8);
+    if (d < rad * rad && d < bd) { bd = d; best = p; }
+  }
+  return best;
+}
+canvas.addEventListener('pointerdown', ev => {
+  if (currentView !== 'sky') return;
+  canvas.setPointerCapture(ev.pointerId);
+  pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  dragMoved = 0;
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+  }
+  canvas.classList.add('grabbing');
+});
+canvas.addEventListener('pointermove', ev => {
+  if (currentView !== 'sky') return;
+  if (pointers.has(ev.pointerId) && (ev.pointerType !== 'mouse' || (ev.buttons & 1))) {
+    const prev = pointers.get(ev.pointerId);
+    const dx = ev.clientX - prev.x, dy = ev.clientY - prev.y;
+    pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    dragMoved += Math.abs(dx) + Math.abs(dy);
+    camTarget = null;
+    if (pointers.size === 1) {
+      cam.x -= dx / cam.z; cam.y -= dy / cam.z;
+    } else if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchDist > 0) zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, d / pinchDist);
+      pinchDist = d;
+    }
+  } else {
+    if (pointers.size && ev.pointerType === 'mouse' && !(ev.buttons & 1)) { pointers.clear(); canvas.classList.remove('grabbing'); }
+    const hp = hitTest(ev.clientX, ev.clientY);
+    if (hp !== hoverPoint) {
+      hoverPoint = hp;
+      const tip = $('#sky-tooltip');
+      if (hp) {
+        const e = hp.e;
+        tip.innerHTML = `<div class="tt-text">${esc(e.text.length > 76 ? e.text.slice(0, 76) + '…' : e.text)}</div>
+          <div class="tt-meta">${hp.kind === 'vocab' ? '◦ word' : '✦ idea'}${e.book ? ' · ' + esc(e.book) : ''}</div>`;
+        tip.classList.add('show');
+      } else tip.classList.remove('show');
+      canvas.classList.toggle('pointing', !!hp);
+      canvas.classList.toggle('can-grab', !hp);
+    }
+    if (hoverPoint) {
+      const tip = $('#sky-tooltip');
+      tip.style.left = Math.min(ev.clientX + 16, W - 320) + 'px';
+      tip.style.top = Math.min(ev.clientY + 14, H - 90) + 'px';
+    }
+  }
+});
+function endPointer(ev) {
+  if (!pointers.has(ev.pointerId)) return;
+  pointers.delete(ev.pointerId);
+  canvas.classList.remove('grabbing');
+  if (pointers.size === 0 && dragMoved < 6) {
+    const hp = hitTest(ev.clientX, ev.clientY);
+    if (hp) openDetail(hp.e.id);
+  }
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('pointerleave', () => { hoverPoint = null; $('#sky-tooltip').classList.remove('show'); });
+window.addEventListener('blur', () => { pointers.clear(); canvas.classList.remove('grabbing'); });
+function zoomAt(mx, my, factor) {
+  const wx = s2wX(mx), wy = s2wY(my);
+  cam.z = Math.min(3.4, Math.max(0.22, cam.z * factor));
+  cam.x = wx - (mx - W / 2) / cam.z;
+  cam.y = wy - (my - H / 2) / cam.z;
+  camTarget = null;
+}
+canvas.addEventListener('wheel', ev => {
+  if (currentView !== 'sky') return;
+  ev.preventDefault();
+  zoomAt(ev.clientX, ev.clientY, Math.exp(-ev.deltaY * 0.0016));
+}, { passive: false });
+
+/* ---------------- sample seed ---------------- */
+function seedSample() {
+  const d = n => Date.now() - n * 86400000;
+  const S = [
+    { type:'idea', text:'Naming a thing is the first act of power over it — Kvothe hunts names the way other men hunt gold.', book:'The Name of the Wind', pageNum:224, whyItMatters:'It reframes learning itself as a kind of magic: to truly know something is to be able to call it.', tags:['naming','magic'], createdAt:d(26) },
+    { type:'idea', text:'Silence has three parts, and the deepest one belongs to the man who is waiting to die.', book:'The Name of the Wind', pageNum:3, whyItMatters:'An opening that teaches you how to read the whole book — mood before plot.', tags:['craft','openings'], createdAt:d(31) },
+    { type:'idea', text:'The Chronicler frame lets the story doubt its own narrator without ever breaking voice.', book:'The Name of the Wind', pageNum:57, tags:['craft','structure'], createdAt:d(24) },
+    { type:'idea', text:'Poverty at the University is written as a physics problem: every talent Kvothe has is rationed by coin.', book:'The Name of the Wind', pageNum:302, whyItMatters:'Fantasy rarely lets money be the real antagonist.', tags:['worldbuilding'], createdAt:d(19) },
+    { type:'vocab', text:'susurrus', book:'The Name of the Wind', definition:'A whispering or rustling sound; a murmur.', phonetic:'/sʊˈsʌɹəs/', partOfSpeech:'noun', contextNote:'The susurrus of the crowd in the Eolian before Kvothe plays.', tags:['sound'], createdAt:d(23) },
+    { type:'vocab', text:'lute', book:'The Name of the Wind', definition:'A plucked stringed instrument with a rounded body and fretted neck.', phonetic:'/luːt/', partOfSpeech:'noun', createdAt:d(30) },
+    { type:'idea', text:'You have power over your mind — not outside events. Realize this, and you will find strength.', book:'Meditations', pageNum:47, whyItMatters:'The whole of Stoicism in two sentences; useful before every exam.', tags:['stoicism','calm'], createdAt:d(14) },
+    { type:'idea', text:'Marcus writes to himself in the second person — the journal as a tool for self-command, not record-keeping.', book:'Meditations', pageNum:12, whyItMatters:'Changed how I think about what a notebook is even for.', tags:['journaling','stoicism'], createdAt:d(12) },
+    { type:'idea', text:'“The impediment to action advances action. What stands in the way becomes the way.”', book:'Meditations', pageNum:89, tags:['stoicism'], createdAt:d(9) },
+    { type:'vocab', text:'equanimity', book:'Meditations', definition:'Mental calmness and composure, especially in a difficult situation.', phonetic:'/ˌɛkwəˈnɪmɪti/', partOfSpeech:'noun', contextNote:'The quality Marcus keeps demanding of himself at war.', tags:['stoicism'], createdAt:d(11) },
+    { type:'idea', text:'A world without gender makes every political alliance personal — Ai keeps reaching for categories that don\'t exist.', book:'The Left Hand of Darkness', pageNum:94, whyItMatters:'Le Guin builds the thought experiment into the plot instead of lecturing.', tags:['sci-fi','gender'], createdAt:d(5) },
+    { type:'idea', text:'“The unknown, the unforetold, the unproven — that is what life is based on.”', book:'The Left Hand of Darkness', pageNum:70, tags:['uncertainty'], createdAt:d(4) },
+    { type:'idea', text:'The ice crossing works because trust is built through shared physical suffering, not conversation.', book:'The Left Hand of Darkness', pageNum:211, whyItMatters:'Action as the only honest dialogue between two aliens.', tags:['friendship'], createdAt:d(2) },
+    { type:'vocab', text:'shifgrethor', book:'The Left Hand of Darkness', definition:'An untranslatable Gethenian concept of prestige, face, and unspoken social standing.', partOfSpeech:'noun', contextNote:'Invented by Le Guin — the dictionary will never know it.', tags:['sci-fi','invented-words'], createdAt:d(3) },
+    { type:'vocab', text:'sonder', definition:'The realization that each random passerby is living a life as vivid and complex as your own.', partOfSpeech:'noun', tags:['feelings'], createdAt:d(7) },
+    { type:'vocab', text:'petrichor', definition:'The pleasant, earthy smell after rain falls on dry ground.', phonetic:'/ˈpɛtɹɪkɔː/', partOfSpeech:'noun', createdAt:d(16) },
+  ];
+  for (const s of S) addEntry(s);
+  fitView(true);
+  toast('Sixteen stars scattered across three books ✦');
+}
+
+/* ---------------- wiring ---------------- */
+function wireModalCloses() {
+  $$('.modal-close').forEach(b => b.onclick = () => closeModals());
+}
+function init() {
+  load();
+  resizeCanvas();
+  refreshBookInputs();
+  updateEmptyState();
+  fitView();
+  requestAnimationFrame(frame);
+
+  // top bar
+  $$('.view-btn').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+  $('#btn-export').addEventListener('click', openExportModal);
+  $('#btn-settings').addEventListener('click', openSettings);
+  $('#btn-sample').addEventListener('click', seedSample);
+
+  // zoom controls
+  $('#zoom-in').addEventListener('click', () => zoomAt(W / 2, H / 2, 1.35));
+  $('#zoom-out').addEventListener('click', () => zoomAt(W / 2, H / 2, 1 / 1.35));
+  $('#zoom-fit').addEventListener('click', () => fitView(true));
+
+  // quick capture
+  let qbType = 'idea';
+  $$('#qb-type button').forEach(b => b.addEventListener('click', () => {
+    qbType = b.dataset.qtype;
+    $$('#qb-type button').forEach(x => x.classList.toggle('active', x === b));
+    $('#qb-text').placeholder = qbType === 'vocab' ? 'A word you just met…' : 'A thought worth keeping…';
+    $('#qb-text').focus();
+  }));
+  const quickAdd = () => {
+    const text = $('#qb-text').value.trim();
+    if (!text) { $('#qb-text').focus(); return; }
+    const entry = addEntry({ type: qbType, text, book: $('#qb-book').value.trim() });
+    $('#qb-text').value = '';
+    if (qbType === 'vocab') runDictionaryFlow(entry);
+    else toast('A new star appears ✦');
+    if (currentView === 'sky') flyToEntry(entry.id);
+    $('#qb-text').focus();
+  };
+  $('#qb-add').addEventListener('click', quickAdd);
+  $('#qb-text').addEventListener('keydown', ev => { if (ev.key === 'Enter') quickAdd(); });
+  $('#qb-book').addEventListener('keydown', ev => { if (ev.key === 'Enter') quickAdd(); });
+  $('#qb-more').addEventListener('click', () =>
+    openEntryModal(null, qbType, $('#qb-text').value.trim(), $('#qb-book').value.trim()));
+
+  // entry form
+  $$('#ef-type button').forEach(b => b.addEventListener('click', () => setEfType(b.dataset.eftype)));
+  $('#entry-form').addEventListener('submit', ev => { ev.preventDefault(); submitEntryForm(); });
+
+  // filters
+  $('#search').addEventListener('input', debounce(() => { F.q = $('#search').value.trim(); renderList(); }, 160));
+  $$('#type-filter button').forEach(b => b.addEventListener('click', () => {
+    F.type = b.dataset.type;
+    $$('#type-filter button').forEach(x => x.classList.toggle('active', x === b));
+    renderList();
+  }));
+  $('#book-filter').addEventListener('change', () => { F.book = $('#book-filter').value; renderList(); });
+  $('#date-from').addEventListener('change', () => { F.from = $('#date-from').value; renderList(); });
+  $('#date-to').addEventListener('change', () => { F.to = $('#date-to').value; renderList(); });
+  $('#clear-filters').addEventListener('click', clearFilters);
+
+  // covers, settings, modals
+  $('#cover-file').addEventListener('change', ev => { handleCoverFile(ev.target.files[0]); ev.target.value = ''; });
+  wireSettings();
+  wireModalCloses();
+  $('#veil').addEventListener('click', () => closeModals());
+
+  // keyboard
+  document.addEventListener('keydown', ev => {
+    const inField = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+    if (ev.key === 'Escape') { closeModals(); hideDictCard(); return; }
+    if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'k') {
+      ev.preventDefault(); $('#qb-text').focus(); return;
+    }
+    if (!inField && ev.key === '/') {
+      ev.preventDefault();
+      if (currentView !== 'list') setView('list');
+      $('#search').focus();
+    }
+  });
+
+  // a gentle memory, resurfaced
+  if (state.entries.length) setTimeout(showResurfaced, 1600);
+}
+init();
+</script>
+</body>
+</html>
