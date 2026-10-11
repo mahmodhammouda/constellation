@@ -717,21 +717,83 @@ function onDataChanged() {
 }
 
 /* ---------------- dictionary ---------------- */
-async function lookupWord(word) {
-  const r = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word.toLowerCase()));
-  if (!r.ok) return null;
-  const j = await r.json();
+/* Three free, keyless sources queried in parallel; the first good answer in
+   priority order wins. Each source resolves to a result, resolves to null
+   ("doesn't know the word"), or rejects (unreachable / timed out). */
+function fetchJson(url, ms) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
+  return fetch(url, { signal: ctl.signal }).then(r => {
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).finally(() => clearTimeout(timer));
+}
+function stripHtml(html) {
+  const body = new DOMParser().parseFromString(html, 'text/html').body;
+  body.querySelectorAll('ol, ul, dl, sup').forEach(n => n.remove());   // nested sub-senses, footnote marks
+  return (body.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
+async function fromDictionaryApi(w) {
+  const j = await fetchJson('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(w), 3500);
   const m = Array.isArray(j) && j[0];
-  if (!m) return null;
-  const meaning = (m.meanings || [])[0];
+  const meaning = m && (m.meanings || [])[0];
   const def = meaning?.definitions?.[0]?.definition;
   if (!def) return null;
   return {
     definition: def,
     phonetic: m.phonetic || (m.phonetics || []).find(p => p.text)?.text || '',
-    partOfSpeech: meaning?.partOfSpeech || '',
+    partOfSpeech: meaning.partOfSpeech || '',
     origin: m.origin || '',
   };
+}
+async function fromWiktionary(w) {
+  const j = await fetchJson('https://en.wiktionary.org/api/rest_v1/page/definition/' + encodeURIComponent(w), 6000);
+  const WORD_CLASSES = ['noun', 'verb', 'adjective', 'adverb', 'preposition', 'conjunction', 'interjection', 'pronoun', 'determiner'];
+  const usages = (j?.en || []).slice().sort((a, b) =>   // real word senses before symbols / abbreviations
+    (WORD_CLASSES.includes((b.partOfSpeech || '').toLowerCase()) ? 1 : 0) - (WORD_CLASSES.includes((a.partOfSpeech || '').toLowerCase()) ? 1 : 0));
+  for (const usage of usages) {
+    for (const d of (usage.definitions || [])) {
+      const text = stripHtml(d.definition || '');
+      if (text.length > 3) return { definition: text, phonetic: '', partOfSpeech: (usage.partOfSpeech || '').toLowerCase(), origin: '' };
+    }
+  }
+  return null;
+}
+const DATAMUSE_POS = { n: 'noun', v: 'verb', adj: 'adjective', adv: 'adverb', u: '' };
+async function fromDatamuse(w) {
+  const j = await fetchJson('https://api.datamuse.com/words?sp=' + encodeURIComponent(w) + '&md=dr&ipa=1&max=1', 6000);
+  const hit = Array.isArray(j) && j.find(x => x.word.toLowerCase() === w);
+  const raw = hit?.defs?.[0];
+  const ipa = (hit?.tags || []).find(t => t.startsWith('ipa_pron:'))?.slice(9);
+  const phonetic = ipa ? `/${ipa}/` : '';
+  if (!raw) return phonetic ? { definition: '', phonetic, partOfSpeech: '', origin: '' } : null;
+  const [pos, def] = raw.split('\t');
+  return { definition: def.trim(), phonetic, partOfSpeech: DATAMUSE_POS[pos] ?? '', origin: '' };
+}
+
+/* -> {definition, phonetic, partOfSpeech, origin} | null (not found) | throws (no source reachable) */
+async function lookupWord(word) {
+  const w = word.trim().toLowerCase();
+  // Wiktionary is fast and thorough; dictionaryapi.dev is last because it is often slow or down.
+  const settled = [fromWiktionary(w), fromDatamuse(w), fromDictionaryApi(w)]
+    .map(p => p.then(v => ({ v }), err => ({ err })));
+  let reachable = 0, best = null;
+  for (const p of settled) {
+    const { v, err } = await p;
+    if (!err) reachable++;
+    if (v?.definition) { best = v; break; }
+  }
+  if (!best) {
+    if (!reachable) throw new Error('offline');
+    return null;
+  }
+  if (!best.phonetic) {        // borrow a pronunciation from Datamuse if it has already answered
+    const dm = await Promise.race([settled[1], new Promise(r => setTimeout(() => r({}), 600))]);
+    if (dm.v?.phonetic) best.phonetic = dm.v.phonetic;
+  }
+  return best;
 }
 
 let dictHideTimer = null;
@@ -762,17 +824,33 @@ function runDictionaryFlow(entry) {
       updateEntry(entry.id, { definition: entry.definition || d.definition, phonetic: d.phonetic, partOfSpeech: d.partOfSpeech, origin: d.origin });
       showDictCard(dictSuccessHtml(entry.text, d));
       dictHideTimer = setTimeout(hideDictCard, 14000);
-    } else dictManualFallback(entry);
-  }).catch(() => dictManualFallback(entry));
+    } else { updateEntry(entry.id, { lookupTried: true }); dictManualFallback(entry, false); }
+  }).catch(() => dictManualFallback(entry, true));
 }
-function dictManualFallback(entry) {
+/* Words saved while the dictionaries were unreachable get a quiet second try on open. */
+async function backfillDefinitions() {
+  const pending = state.entries.filter(e => e.type === 'vocab' && !e.definition && !e.lookupTried);
+  let filled = 0;
+  for (const e of pending) {
+    let d;
+    try { d = await lookupWord(e.text); } catch { return; }   // still offline — try again next visit
+    if (d) { updateEntry(e.id, { definition: d.definition, phonetic: d.phonetic, partOfSpeech: d.partOfSpeech, origin: d.origin }); filled++; }
+    else updateEntry(e.id, { lookupTried: true });
+  }
+  if (filled) toast(`Found definitions for ${filled} earlier word${filled === 1 ? '' : 's'} ✦`);
+}
+function dictManualFallback(entry, offline) {
   showDictCard(`
     <div class="dc-word">${esc(entry.text)}</div>
-    <div class="dc-miss">The dictionary hasn't met this one. Give it your own meaning — those stars often shine brightest.</div>
+    <div class="dc-miss">${offline
+      ? 'The dictionaries are out of reach right now — check your connection and try again, or give it your own meaning.'
+      : 'The dictionary hasn\'t met this one. Give it your own meaning — those stars often shine brightest.'}</div>
     <div class="dc-manual">
       <input id="dc-manual-input" placeholder="Your definition…" aria-label="Your definition">
       <button id="dc-manual-save" class="primary-btn" style="min-height:38px">Save</button>
+      ${offline ? '<button id="dc-retry" class="ghost-btn" style="min-height:38px">Try again</button>' : ''}
     </div>`);
+  if (offline) $('#dc-retry').onclick = () => runDictionaryFlow(entry);
   const input = $('#dc-manual-input');
   const saveDef = () => {
     const v = input.value.trim();
@@ -1847,6 +1925,7 @@ function init() {
 
   // a gentle memory, resurfaced
   if (state.entries.length) setTimeout(showResurfaced, 1600);
+  setTimeout(backfillDefinitions, 2500);
 }
 init();
 </script>
